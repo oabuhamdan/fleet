@@ -1,0 +1,27 @@
+topology:
+  source: "topohub"
+  topohub_id: "gabriel/5/0"
+  link_config: { }
+  extra: { }
+
+fl:
+  clients_number: 10
+  server_placement: "highest_degree"
+  client_placement: "lowest_degree"
+  image: "fl-mininet:latest"
+  network: "10.0.0.0/16"
+  extra: { }
+
+bg:
+  enabled: false
+  image: "bg-mininet:latest"
+  network: "10.1.0.0/16"
+  extra: { }
+
+sdn:
+  sdn_enabled: false
+  controller_ip: "localhost"
+  controller_port: 6633
+  controller_type: "openflow"
+  extra: { }
+

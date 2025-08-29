@@ -1,0 +1,49 @@
+# Use a stable Debian release
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libprotobuf-dev \
+    protobuf-compiler \
+    cmake \
+    pkg-config \
+    python3 \
+    python3-venv \
+    python3-pip \
+    python3-dev \
+    iperf3 \
+    net-tools \
+    iputils-ping \
+    iproute2 \
+    nano \
+    curl \
+    ethtool \
+    sed \
+    tcpdump \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy Python dependencies first (to leverage caching)
+#COPY requirements.txt .
+
+# Create virtual environment and install Python packages
+RUN python3 -m venv venv \
+ && ./venv/bin/pip install --upgrade pip setuptools wheel \
+ && ./venv/bin/pip install flwr psutil apscheduler hydra-core zmq \
+ && ./venv/bin/pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+## Copy application files
+#COPY network_stats.sh .
+#COPY traffic_monitor.py .
+#
+## Ensure script executability
+#RUN chmod +x network_stats.sh
+
+# Default to an interactive shell
+CMD ["/bin/bash"]

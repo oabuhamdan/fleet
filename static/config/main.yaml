@@ -1,0 +1,11 @@
+defaults:
+  - _self_
+  - net: default
+  - dataset: default
+  - general@general
+
+hydra:
+  run:
+    dir: ${general.log_path}
+  job:
+    name: ${general.exp_name}

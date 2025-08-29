@@ -1,0 +1,9 @@
+#data_path: "static/data"
+#seed: 42
+#zmq_publish: true
+#zmq_ip_address: "localhost"
+#zmq_port: 5555
+#collect_metrics: true
+#logging_level: "INFO"
+exp_name: "my_experiment"
+log_path: static/logs/${general.exp_name}-${now:%m-%d_%H-%M-%S}

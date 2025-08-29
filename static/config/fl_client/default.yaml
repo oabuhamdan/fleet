@@ -1,0 +1,5 @@
+train_batch_size: 32
+val_batch_size: 128
+local_epochs: 1
+learning_rate: 0.001
+log_interval: 100

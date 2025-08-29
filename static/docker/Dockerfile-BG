@@ -1,0 +1,20 @@
+FROM ubuntu:22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    iperf3 \
+    net-tools \
+    iputils-ping \
+    iproute2 \
+    ethtool \
+    bc \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+#COPY network_stats.sh start_iperf.sh start_iperf.py ./
+#RUN chmod +x network_stats.sh start_iperf.sh
+
+CMD ["/bin/bash"]

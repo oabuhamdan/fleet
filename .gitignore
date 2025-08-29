@@ -1,0 +1,5 @@
+.idea
+.venv/
+static/logs
+static/log
+static/data
