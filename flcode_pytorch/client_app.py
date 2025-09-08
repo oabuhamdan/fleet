@@ -112,8 +112,10 @@ def init_client(context: Context):
         simple_id=simple_id,
         flwr_ctx=context,
         client_cfg=client_cfg,
+        dataset_cfg=dataset_cfg,
         device=device
     )
+
     trainloader = get_dataloader(
         CONTAINER_DATA_PATH, dataset_cfg.name,
         simple_id, batch_size=client_cfg.train_batch_size,
