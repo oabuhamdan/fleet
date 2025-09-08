@@ -1,8 +1,8 @@
 import ipaddress
 import itertools
+import os
 import random
-from enum import Enum
-from typing import Dict, List, Optional, Iterator, Any
+from typing import Dict, List, Optional, Iterator, Any, Type
 
 import topohub.mininet
 from mininet.node import Docker
@@ -10,12 +10,13 @@ from mininet.topo import Topo
 
 from common.configs import GeneralConfig
 from common.loggers import info
+from common.static import CONTAINER_LOG_PATH, CONTAINER_DATA_PATH, CONTAINER_CONFIG_PATH
 from containernet_code.config import NetConfig, TopologyConfig
 
 # Constants
 FL_SERVER_NAME = "flserver"
-FL_NAME_FORMAT = "flc-{id}"
-BG_NAME_FORMAT = "bgc-{switch}"
+FL_NAME_FORMAT = "flc{id}"
+BG_NAME_FORMAT = "bgc{switch}"
 
 
 class TopoProcessor:
@@ -32,7 +33,7 @@ class TopoProcessor:
         """Load topology from file."""
         raise NotImplementedError("Subclasses must implement this method.")
 
-    def get_processed_topology(self) -> Topo:
+    def get_topo(self) -> Topo:
         """Process topology into nodes and links."""
         raise NotImplementedError("Subclasses must implement this method.")
 
@@ -58,7 +59,7 @@ class CustomTopoProcessor(TopoProcessor):
         self.topo = topo_class()
         self.loaded = True
 
-    def get_processed_topology(self) -> Topo:
+    def get_topo(self) -> Topo:
         """
         Process custom Mininet topology into nodes and links.
         The user is supposed to add all other details in the custom topology class.
@@ -111,7 +112,7 @@ class TopohubTopoProcessor(TopoProcessor):
         self.topo = topo_cls()
         self.loaded = True
 
-    def get_processed_topology(self) -> Topo:
+    def get_topo(self) -> Topo:
         """Process TopoHub topology into nodes and links."""
         if not self.loaded:
             self.load_topology()
@@ -152,14 +153,10 @@ class TopohubTopoProcessor(TopoProcessor):
             )
 
 
-class TopologyLoaders(Enum):
-    """Enum for topology source types."""
-    CUSTOM = CustomTopoProcessor
-    TOPOHUB = TopohubTopoProcessor
-
-    def init(self, *args, **kwargs):
-        """Call the function associated with this strategy."""
-        return self.value(*args, **kwargs)
+TOPOLOGY_PROCESSORS: Dict[str, Type[TopoProcessor]] = {
+    "CUSTOM": CustomTopoProcessor,
+    "TOPOHUB": TopohubTopoProcessor,
+}
 
 
 def highest_degree(nodes, **kwargs):
@@ -185,15 +182,12 @@ def specific_node(nodes, **kwargs):
     return node_id
 
 
-# --- Enum for strategy registry ---
-class PlacementStrategy(Enum):
-    HIGHEST_DEGREE = highest_degree
-    LOWEST_DEGREE = lowest_degree
-    RANDOM = random_nodes
-    SPECIFIC_NODE = specific_node
-
-    def apply(self, nodes, **kwargs):
-        return self.value(nodes, **kwargs)
+PLACEMENT_STRATEGIES = {
+    "highest_degree": highest_degree,
+    "lowest_degree": lowest_degree,
+    "specific_node": specific_node,
+    "random": random_nodes,
+}
 
 
 def random_pairs(config):
@@ -232,59 +226,60 @@ def homogeneous_pairs(config):
         yield cpu, mem
 
 
-class ClientLimitsGenerator(Enum):
-    RANDOM = random_pairs
-    STEPPED = stepped_pairs
-    HOMOGENEOUS = homogeneous_pairs
-
-    @classmethod
-    def generator(cls, cfg, **kwargs) -> Iterator[Dict[str, Any]]:
-        if not cfg: yield {}
-
-        name = cfg.get("distribution", "homogeneous").upper()
-        pair_generator = cls[name].value(**kwargs)
-
-        for cpu, mem in pair_generator:
-            yield {
-                "mem_limit": f"{mem}m",
-                "memswap_limit": f"{mem}m",
-                "cpu_period": 100000,
-                "cpu_quota": int(cpu * 100000),
-            }
+CLIENT_LIMIT_GENERATORS = {
+    "RANDOM": random_pairs,
+    "STEPPED": stepped_pairs,
+    "HOMOGENEOUS": homogeneous_pairs,
+}
 
 
-class MyTopology(Topo):
-    """Mininet topology with enhanced topology handling."""
+def client_limits_generator(cfg, **kwargs) -> Iterator[Dict[str, Any]]:
+    if not cfg:
+        yield {}
+        return
 
-    def __init__(self, general_cfg: GeneralConfig,net_cfg: NetConfig, *args, **kwargs) -> None:
+    name = cfg.get("distribution", "homogeneous").upper()
+    pair_generator = CLIENT_LIMIT_GENERATORS[name](cfg)
+
+    for cpu, mem in pair_generator:
+        yield {
+            "mem_limit": f"{mem}m",
+            "memswap_limit": f"{mem}m",
+            "cpu_period": 100000,
+            "cpu_quota": int(cpu * 100000),
+        }
+
+
+class TopologyHandler:
+    """Class to handle network topology creation and management."""
+
+    def __init__(self, general_cfg: GeneralConfig, net_cfg: NetConfig, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.net_cfg = net_cfg
         self.general_cfg = general_cfg
+        self.topo = self._load_topology()
         self.fl_server: Optional[str] = None
         self.fl_clients: List[str] = []
         self.bg_clients: List[str] = []
-        self.topo = self._load_and_process_topology()
-        self.build(topo_loaded=True)
+        self.setup_fl_components()
 
-    def _load_and_process_topology(self) -> Topo:
+    def _load_topology(self) -> Topo:
         """Load and process topology data based on configuration."""
         try:
             source = self.net_cfg.topology.source.upper()
-            processor = TopologyLoaders[source].init(self.net_cfg.topology)
+            processor = TOPOLOGY_PROCESSORS[source](self.net_cfg.topology)
         except KeyError:
             raise ValueError(f"Invalid topology source name: {self.net_cfg.topology.source}")
 
-        return processor.get_processed_topology()
+        return processor.get_topo()
 
-    def build(self, *args, **params) -> None:
+    def setup_fl_components(self) -> None:
         """Build the complete network topology."""
-        if not params.get("topo_loaded", False):
-            return
-
         info("Building network topology...")
+
         fl_network_hosts = ipaddress.ip_network(self.net_cfg.fl.network).hosts()
         server_node_id = self._create_fl_server(fl_network_hosts)
-        self._create_fl_clients(fl_network_hosts, server_node_id)
+        self._create_fl_clients(server_node_id, fl_network_hosts)
 
         if self.net_cfg.bg.enabled:
             if self.net_cfg.bg.network == self.net_cfg.fl.network:
@@ -292,80 +287,85 @@ class MyTopology(Topo):
             else:
                 bg_network_hosts = ipaddress.ip_network(self.net_cfg.bg.network).hosts()
             self._create_background_hosts(bg_network_hosts)
-
         print(f"Topology built: {len(self.topo.switches())} switches, {len(self.topo.links())} links")
 
-    def _create_fl_server(self, fl_network_hosts) -> int:
+    def _create_fl_server(self, fl_network_hosts) -> str:
         """Create FL server and connect it to the network."""
-        nodes = self.topo.g.node.copy()
-        placement = self.net_cfg.fl.server_placement.upper()
-        server_specific = self.net_cfg.fl.server_node_id
-        info("Available strategies:", list(PlacementStrategy.__members__.keys()))
-        server_switch = PlacementStrategy[placement].apply(nodes, node_id=server_specific, single=True)
+        switches = self.get_switches()
+        placement_name = self.net_cfg.fl.server_placement.get("name")
+        placement_kwargs = self.net_cfg.fl.server_placement
+        server_switch = PLACEMENT_STRATEGIES[placement_name](switches, single=True, **placement_kwargs)
 
-        server_limits = next(ClientLimitsGenerator.generator(self.net_cfg.fl.server_limits))
+        server_limits = next(client_limits_generator(self.net_cfg.fl.server_limits))
         ip = str(next(fl_network_hosts))  # assigns the first IP to the server
-        self.fl_server = self.addHost(
+        self.fl_server = self.topo.addHost(
             FL_SERVER_NAME,
             ip=ip,
             mac=self._ip_to_mac(ip),
             dimage=self.net_cfg.fl.image,
-            **self._get_container_commons(self.general_cfg.data_path, self.general_cfg.log_path),
+            **self._get_container_commons(self.general_cfg),
             **server_limits
         )
-
-        self.addLink(self.fl_server, server_switch)
+        self.topo.addLink(self.fl_server, server_switch)
         info(f"FL server placed on node {server_switch}")
         return server_switch
 
-    def _create_fl_clients(self, server_node_id, fl_network_hosts) -> None:
+    def _create_fl_clients(self, server_node_id: str, fl_network_hosts) -> None:
         """Create FL clients and connect them to the network."""
-        nodes = self.topo.g.node.copy()
-        nodes.pop(server_node_id)  # exclude server switch from client placement
-        placement = self.net_cfg.fl.client_placement.upper()
-        client_nodes = PlacementStrategy[placement].apply(self.topo.g.node)
+        switches = self.get_switches()
+        switches.pop(server_node_id)  # exclude server switch from client placement
 
-        client_limits_generator = ClientLimitsGenerator.generator(self.net_cfg.fl.clients_limits)
+        placement_name = self.net_cfg.fl.client_placement.get("name")
+        placement_kwargs = self.net_cfg.fl.client_placement
+        client_nodes = PLACEMENT_STRATEGIES[placement_name](switches, **placement_kwargs)
+
+        limits_generator = client_limits_generator(self.net_cfg.fl.clients_limits)
         for i in range(1, self.net_cfg.fl.clients_number + 1):
             ip = str(next(fl_network_hosts))
-            fl_client = self.addHost(
+            fl_client = self.topo.addHost(
                 FL_NAME_FORMAT.format(id=i),
                 ip=ip, mac=self._ip_to_mac(ip),
                 dimage=self.net_cfg.fl.image,
-                **self._get_container_commons(self.general_cfg.data_path, self.general_cfg.log_path),
-                **next(client_limits_generator)
+                **self._get_container_commons(self.general_cfg),
+                **next(limits_generator)
             )
 
             client_switch = client_nodes[i % len(client_nodes)]
-            self.addLink(fl_client, client_switch)
+            self.topo.addLink(fl_client, client_switch)
             self.fl_clients.append(fl_client)
 
         info(f"Created {len(self.fl_clients)} FL clients")
 
     def _create_background_hosts(self, bg_network_hosts) -> None:
         """Create background traffic hosts."""
-        limits_generator = ClientLimitsGenerator.generator(self.net_cfg.bg.clients_limits)
-        for switch in self.switches():
+        limits_generator = client_limits_generator(self.net_cfg.bg.clients_limits)
+        for switch in self.topo.switches():
             ip = str(next(bg_network_hosts))
-            bg_host = self.addHost(
+            bg_host = self.topo.addHost(
                 BG_NAME_FORMAT.format(switch=switch),
                 ip=ip, mac=self._ip_to_mac(ip),
                 dimage=self.net_cfg.bg.image,
-                **self._get_container_commons(self.general_cfg.data_path, self.general_cfg.log_path),
+                **self._get_container_commons(self.general_cfg),
                 **next(limits_generator)
             )
-            self.addLink(bg_host, switch)
+            self.topo.addLink(bg_host, switch)
             self.bg_clients.append(bg_host)
 
         info(f"Created {len(self.bg_clients)} background hosts")
 
+    def get_switches(self) -> Dict[str, Dict]:
+        """Return list of switch info."""
+        return {n: self.topo.nodeInfo(n) for n in self.topo.switches()}
+
     @staticmethod
-    def _get_container_commons(data_path, logs_path) -> Dict:
+    def _get_container_commons(general_config: GeneralConfig) -> Dict:
         """Return containernet configuration parameters."""
+        absolute_path = os.getcwd()
         return {
             "volumes": [
-                f"{data_path}:/app/data",
-                f"{logs_path}:/app/logs"
+                f"{absolute_path}/{general_config.data_path}:{CONTAINER_DATA_PATH}",
+                f"{absolute_path}/{general_config.log_path}:{CONTAINER_LOG_PATH}",
+                f"{absolute_path}/{general_config.config_path}:{CONTAINER_CONFIG_PATH}",
             ],
             "sysctls": {"net.ipv4.tcp_congestion_control": "cubic"},
             "cls": Docker
