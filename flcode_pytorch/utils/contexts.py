@@ -4,18 +4,19 @@ import torch
 from flwr.common import Context
 
 from common.configs import *
+from common.dataset_utils import DatasetConfig
 
 
 class ServerContext(NamedTuple):
     flwr_ctx: Context
-    general_cfg: GeneralConfig
     server_cfg: ServerConfig
+    dataset_cfg: DatasetConfig
     device: torch.device
 
 
 class ClientContext(NamedTuple):
     simple_id: int
     flwr_ctx: Context
-    general_cfg: GeneralConfig
     client_cfg: ClientConfig
+    dataset_cfg: DatasetConfig
     device: torch.device
