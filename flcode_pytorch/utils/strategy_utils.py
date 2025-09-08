@@ -6,6 +6,7 @@ from flwr.server import strategy
 from flwr.server.strategy import Strategy
 from torch import nn
 
+from common.static import CONTAINER_DATA_PATH
 from flcode_pytorch.utils.contexts import ServerContext
 from common.dataset_utils import get_dataloader
 from flcode_pytorch.utils.model_utils import get_weights, set_weights, test
@@ -37,7 +38,7 @@ def get_aggregation_fn(metrics_agg_map: dict[str, str]) -> callable:
 
 def get_evaluate_fn(ctx, model):
     valloader = get_dataloader(
-        ctx.general_cfg.data_path, ctx.general_cfg.dataset_name,
+        CONTAINER_DATA_PATH, ctx.dataset_cfg.name,
         "server_eval", batch_size=ctx.server_cfg.val_batch_size, split="test"
     )
 

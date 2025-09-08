@@ -1,0 +1,3 @@
+CONTAINER_LOG_PATH = "/app/log"
+CONTAINER_CONFIG_PATH = "/app/config"
+CONTAINER_DATA_PATH = "/app/data"

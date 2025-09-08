@@ -8,6 +8,7 @@ from flwr.common import log
 from flwr.server import History
 
 from common.loggers import *
+from common.static import CONTAINER_LOG_PATH
 from flcode_pytorch.utils.contexts import ServerContext
 
 
@@ -112,7 +113,7 @@ class MyServer(flwr.server.Server):
                 if parameters_aggregated:
                     self.parameters = parameters_aggregated
                 history.add_metrics_distributed_fit(server_round=current_round, metrics=fit_metrics_aggregated)
-                log_metrics_federated("fit", current_round, fit_metrics_federated, self.ctx.general_cfg.log_path)
+                log_metrics_federated("fit", current_round, fit_metrics_federated, CONTAINER_LOG_PATH)
                 log_failures_federated("fit", current_round, fit_failures)
                 aggregate_round_metrics["fit_time"] = fit_end_time - round_start_time
                 aggregate_round_metrics["fit_metrics"] = fit_metrics_aggregated
@@ -146,11 +147,11 @@ class MyServer(flwr.server.Server):
                     history.add_loss_distributed(server_round=current_round, loss=loss_aggregated)
                     history.add_metrics_distributed(server_round=current_round, metrics=eval_metrics_aggregated)
                     total_time = fed_eval_end_time - fed_eval_start_time
-                    log_metrics_federated("eval", current_round, eval_metrics_federated, self.ctx.general_cfg.log_path)
+                    log_metrics_federated("eval", current_round, eval_metrics_federated, CONTAINER_LOG_PATH)
                     log_failures_federated("eval", current_round, eval_failures)
                     aggregate_round_metrics["fed_eval_metrics"] = eval_metrics_aggregated
                     aggregate_round_metrics["fed_eval_total_time"] = total_time
-            log_aggregated_metrics(aggregate_round_metrics, self.ctx.general_cfg.log_path)
+            log_aggregated_metrics(aggregate_round_metrics, CONTAINER_LOG_PATH)
 
             if self.ctx.server_cfg.stop_by_accuracy:
                 if self.reached_accuracy(aggregate_round_metrics, self.ctx.server_cfg.accuracy_level):
