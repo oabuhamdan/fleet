@@ -1,5 +1,4 @@
 from dataclasses import field, dataclass
-from dataclasses import field, dataclass
 from pathlib import Path
 
 import datasets
@@ -8,8 +7,8 @@ from datasets import get_dataset_split_names
 from flwr_datasets import FederatedDataset
 from flwr_datasets import partitioner
 from torch.utils.data import DataLoader
-from torchtext.data.utils import get_tokenizer
 from torchvision.transforms import transforms
+from transformers import AutoTokenizer
 
 from common.loggers import configure_logger, warning
 
@@ -35,7 +34,6 @@ def prepare_datasets(cfg: DatasetConfig):
     data_path = f"{cfg.path}/{clean_name}"
     if not cfg.force_create and Path(data_path).exists():
         return
-
     partitioner_cls = getattr(partitioner, cfg.partitioner_cls_name)
     partitioner_instance = partitioner_cls(**cfg.partitioner_kwargs)
 
@@ -84,7 +82,7 @@ def process_img_dataset(dataset, img_key="img", extra_transforms=None):
 
 
 def process_text_dataset(dataset, text_key, tokenizer=None, **tokenizer_kwargs):
-    tokenizer = get_tokenizer("basic_english") if tokenizer is None else tokenizer
+    tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased") if tokenizer is None else tokenizer
 
     def apply_tokenizer(batch):
         batch[text_key] = [tokenizer(text, **tokenizer_kwargs) for text in batch[text_key]]
@@ -110,15 +108,11 @@ def get_dataloader(dataset_path, dataset_name, partition_id, batch_process=None,
     return DataLoader(dataset, batch_size=batch_size, **dataloader_kwargs)
 
 
-def parse_nested_kv(partitioner_args):
-    return dict(pair.split("=", 1) for pair in partitioner_args.split(",") if "=" in pair)
-
-
-@hydra.main(config_path="static/config", config_name="dataset", version_base=None)
-def script_call(cfg: DatasetConfig):
-    configure_logger("default", False, None, "INFO")
-    prepare_datasets(cfg)
-
-
-if __name__ == "__main__":
-    script_call()
+# @hydra.main(config_path="../static/config/dataset", config_name="default", version_base=None)
+# def script_call(cfg: DatasetConfig):
+#     configure_logger("default", False, None, "INFO")
+#     prepare_datasets(cfg)
+#
+#
+# if __name__ == "__main__":
+#     script_call()
