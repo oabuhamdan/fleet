@@ -1,8 +1,10 @@
 defaults:
-  - _self_
+  - base_main
+  - general@general
   - net: default
   - dataset: default
-  - general@general
+  - _self_
+
 
 hydra:
   run:
