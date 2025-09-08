@@ -7,14 +7,15 @@ import torch
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context, Config, Scalar
 
-from common.configs import GeneralConfig, setup_config
+from common.configs import setup_config
+from common.dataset_utils import get_dataloader, DatasetConfig
 from common.loggers import init_zmq, configure_logger, info, debug, warning, to_zmq
+from common.static import CONTAINER_LOG_PATH, CONTAINER_CONFIG_PATH, CONTAINER_DATA_PATH
 from .utils import client_metrics_utils
+from .utils.client_metrics_utils import MetricsCollector
 from .utils.configs import ClientConfig
 from .utils.contexts import ClientContext
-from common.dataset_utils import get_dataloader
 from .utils.model_utils import Net, get_weights, set_weights, test, train
-from .utils.client_metrics_utils import MetricsCollector
 
 
 class FlowerClient(NumPyClient):
@@ -100,35 +101,32 @@ class FlowerClient(NumPyClient):
 
 
 def init_client(context: Context):
-    general_cfg: GeneralConfig = setup_config("general")
-    client_cfg: ClientConfig = setup_config("client")
+    client_cfg: ClientConfig = setup_config(CONTAINER_CONFIG_PATH, "client", ClientConfig)
+    dataset_cfg: DatasetConfig = setup_config(CONTAINER_CONFIG_PATH, "dataset", DatasetConfig)
     simple_id = context.node_config["cid"]
-
-    log_file = Path(general_cfg.log_path) / f"client_{context.node_config['cid']}.log"
-    configure_logger("default", client_cfg.log_to_stream, log_file, general_cfg.logging_level)
+    log_file = Path(CONTAINER_LOG_PATH) / f"client_{context.node_config['cid']}.log"
+    configure_logger("default", client_cfg.log_to_stream, log_file, client_cfg.logging_level)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     ctx = ClientContext(
         simple_id=simple_id,
         flwr_ctx=context,
-        general_cfg=general_cfg,
         client_cfg=client_cfg,
         device=device
     )
-
     trainloader = get_dataloader(
-        general_cfg.data_path, general_cfg.dataset_name,
+        CONTAINER_DATA_PATH, dataset_cfg.name,
         simple_id, batch_size=client_cfg.train_batch_size,
         split="train", shuffle=True
     )
 
     valloader = get_dataloader(
-        general_cfg.data_path, general_cfg.dataset_name, simple_id,
+        CONTAINER_DATA_PATH, dataset_cfg.name, simple_id,
         batch_size=client_cfg.val_batch_size, split="test"
     )
 
-    if client_cfg.zmq_publish:
-        init_zmq("default", general_cfg.zmq_ip_address, general_cfg.zmq_port)
+    if client_cfg.zmq["enable"]:
+        init_zmq("default", client_cfg.zmq["host"], client_cfg.zmq["port"])
         system_props = client_metrics_utils.get_client_properties()
         to_zmq(f"client-props", {"client_id": ctx.simple_id, "system": system_props})
 
@@ -140,7 +138,7 @@ def init_client(context: Context):
             publish_callback=lambda metrics: to_zmq(
                 "client-props",
                 {"client_id": ctx.simple_id, "metrics": metrics}
-            ) if client_cfg.zmq_publish else None
+            ) if client_cfg.zmq["enable"] else None
         )
 
     model = Net()
