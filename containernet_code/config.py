@@ -18,13 +18,12 @@ class TopologyConfig:
 class FLClientConfig:
     """FL configuration"""
     clients_number: int = 10
-    server_placement: str = "highest_degree"
-    server_node_id: Optional[int] = None
-    client_placement: str = "lowest_degree"
+    server_placement: Dict = field(default_factory=lambda: {"name": "highest_degree"})
+    client_placement: Dict = field(default_factory=lambda: {"name": "lowest_degree"})
     image: str = "fl-app:latest"
     network: str = "10.0.0.0/16"
-    clients_limits: Dict = field(default_factory=lambda: {"distribution": "homogeneous", "cpu": 0.5, "mem": 256})
-    server_limits: Optional[Dict] = field(default_factory=lambda: {"cpu": 1, "mem": 2048})
+    clients_limits: Dict = field(default_factory=lambda: {"distribution": "homogeneous", "cpu": 0.7, "mem": 1024})
+    server_limits: Optional[Dict] = field(default_factory=lambda: {"cpu": 1, "mem": 4096})
     extra: Dict = field(default_factory=dict)
 
 
