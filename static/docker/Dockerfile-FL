@@ -3,6 +3,7 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+ARG TORCH_BASE="--index-url https://download.pytorch.org/whl/cpu"
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
@@ -36,7 +37,7 @@ WORKDIR /app
 RUN python3 -m venv venv \
  && ./venv/bin/pip install --upgrade pip setuptools wheel \
  && ./venv/bin/pip install flwr psutil apscheduler hydra-core zmq flwr-datasets transformers\
- && ./venv/bin/pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+ && ./venv/bin/pip install torch torchvision $TORCH_BASE
 
 ## Copy application files
 #COPY network_stats.sh .
