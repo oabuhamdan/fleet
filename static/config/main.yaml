@@ -1,13 +1,16 @@
 defaults:
   - base_main
-  - general@general
   - net: default
   - dataset: default
+  - fl_server: default
+  - fl_client: default
   - _self_
 
+exp_name: "my_experiment"
+log_dir: "static/logs/${exp_name}-${now:%m-%d_%H-%M-%S}"
 
 hydra:
   run:
-    dir: ${general.log_path}
+    dir: ${log_dir}
   job:
-    name: ${general.exp_name}
+    name: ${exp_name}

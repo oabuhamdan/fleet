@@ -3,8 +3,8 @@ from typing import NamedTuple
 import torch
 from flwr.common import Context
 
-from common.configs import *
 from common.dataset_utils import DatasetConfig
+from flcode_pytorch.utils.configs import ServerConfig, ClientConfig
 
 
 class ServerContext(NamedTuple):

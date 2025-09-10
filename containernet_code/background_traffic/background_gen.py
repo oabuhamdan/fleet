@@ -4,10 +4,10 @@ from mininet.node import Host
 from mininet.topo import Topo
 
 from common.loggers import info
+from common.static import BG_NAME_FORMAT
 from .traffic_generators import TrafficGenerator
 from .traffic_patterns import TrafficPattern
 from ..config import BGConfig
-from ..my_topology import BG_NAME_FORMAT
 
 
 # Main BGTrafficGenerator Class

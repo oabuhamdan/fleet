@@ -8,16 +8,11 @@ import topohub.mininet
 from mininet.node import Docker
 from mininet.topo import Topo
 
-from common.configs import GeneralConfig
 from common.loggers import info
-from common.static import CONTAINER_LOG_PATH, CONTAINER_DATA_PATH, CONTAINER_CONFIG_PATH
+from common.static import *
 from containernet_code.config import NetConfig, TopologyConfig
 
 # Constants
-FL_SERVER_NAME = "flserver"
-FL_NAME_FORMAT = "flc{id}"
-BG_NAME_FORMAT = "bgc{switch}"
-
 
 class TopoProcessor:
     """Base class for processing topologies."""
@@ -253,10 +248,10 @@ def client_limits_generator(cfg, **kwargs) -> Iterator[Dict[str, Any]]:
 class TopologyHandler:
     """Class to handle network topology creation and management."""
 
-    def __init__(self, general_cfg: GeneralConfig, net_cfg: NetConfig, *args, **kwargs) -> None:
+    def __init__(self, log_path, net_cfg: NetConfig, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.net_cfg = net_cfg
-        self.general_cfg = general_cfg
+        self.log_path = log_path
         self.topo = self._load_topology()
         self.fl_server: Optional[str] = None
         self.fl_clients: List[str] = []
@@ -303,7 +298,7 @@ class TopologyHandler:
             ip=ip,
             mac=self._ip_to_mac(ip),
             dimage=self.net_cfg.fl.image,
-            **self._get_container_commons(self.general_cfg),
+            **self._get_container_commons(self.log_path),
             **server_limits
         )
         self.topo.addLink(self.fl_server, server_switch)
@@ -326,7 +321,7 @@ class TopologyHandler:
                 FL_NAME_FORMAT.format(id=i),
                 ip=ip, mac=self._ip_to_mac(ip),
                 dimage=self.net_cfg.fl.image,
-                **self._get_container_commons(self.general_cfg),
+                **self._get_container_commons(self.log_path),
                 **next(limits_generator)
             )
 
@@ -345,7 +340,7 @@ class TopologyHandler:
                 BG_NAME_FORMAT.format(switch=switch),
                 ip=ip, mac=self._ip_to_mac(ip),
                 dimage=self.net_cfg.bg.image,
-                **self._get_container_commons(self.general_cfg),
+                **self._get_container_commons(self.log_path),
                 **next(limits_generator)
             )
             self.topo.addLink(bg_host, switch)
@@ -358,14 +353,15 @@ class TopologyHandler:
         return {n: self.topo.nodeInfo(n) for n in self.topo.switches()}
 
     @staticmethod
-    def _get_container_commons(general_config: GeneralConfig) -> Dict:
+    def _get_container_commons(log_path) -> Dict:
         """Return containernet configuration parameters."""
         absolute_path = os.getcwd()
         return {
             "volumes": [
-                f"{absolute_path}/{general_config.data_path}:{CONTAINER_DATA_PATH}",
-                f"{absolute_path}/{general_config.log_path}:{CONTAINER_LOG_PATH}",
-                f"{absolute_path}/{general_config.config_path}:{CONTAINER_CONFIG_PATH}",
+                f"{absolute_path}/{log_path}",
+                f"{absolute_path}/{LOCAL_DATA_PATH}:{CONTAINER_DATA_PATH}",
+                f"{absolute_path}/{LOCAL_SCRIPTS_PATH}:{CONTAINER_SCRIPTS_PATH}",
+                f"{absolute_path}/{LOCAL_RESOLVED_CONFIG_PATH}:{CONTAINER_RESOLVED_CONFIG_PATH}"
             ],
             "sysctls": {"net.ipv4.tcp_congestion_control": "cubic"},
             "cls": Docker

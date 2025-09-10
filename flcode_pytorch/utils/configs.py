@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Any, Dict
 
+from omegaconf import OmegaConf
+
 
 @dataclass
 class ServerConfig:
@@ -38,3 +40,9 @@ class ClientConfig:
     server_address: str = "tcp://localhost:5555"
     zmq: Dict[str, Any] = field(default_factory=lambda: {"enable": False, "host": "localhost", "port": 5555})
     extra: Dict[str, Any] = field(default_factory=dict)
+
+def get_configs_from_file(path, configs_name, data_class_type):
+    cfg = OmegaConf.load(path)
+    cfg = OmegaConf.to_container(getattr(cfg, configs_name), resolve=True)
+    cfg = OmegaConf.merge(data_class_type(), cfg)
+    return cfg
