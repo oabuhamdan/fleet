@@ -8,7 +8,6 @@ from threading import Lock
 from typing import Dict, Optional, Tuple
 
 import zmq
-from flwr.common.logger import FLOWER_LOGGER
 
 _loggers: Dict[str, logging.Logger] = {}
 _lock = Lock()
@@ -81,7 +80,6 @@ def to_csv(file_path: str, row_dict: dict = None, fieldnames=None):
         if file_path not in _csv_files:
             f = open(file_path, "a", newline="")
             fnames = list(row_dict.keys()) if row_dict else fieldnames or []
-            FLOWER_LOGGER.info(f"Creating CSV file {file_path} with fieldnames {fnames}")
             writer = csv.DictWriter(f, fieldnames=fnames)
             if f.tell() == 0 and fnames:
                 writer.writeheader()
