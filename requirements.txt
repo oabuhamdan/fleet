@@ -15,7 +15,7 @@ cycler==0.12.1
 datasets==3.1.0
 dill==0.3.8
 filelock==3.19.1
-flwr==1.21.0
+flwr==1.20.0
 flwr-datasets==0.5.0
 fonttools==4.59.2
 frozenlist==1.7.0
