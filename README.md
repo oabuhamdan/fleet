@@ -22,11 +22,27 @@ The workflow is **fully orchestrated with Hydra** and YAML-based configuration, 
 This bridges the gap between **pure FL simulations** and **real-world deployments**, enabling researchers to jointly evaluate **algorithmic performance** and **network dynamics**.  
 
 ---
+## 📚 Reference
 
+If you use this testbed in your research, please cite our work:
+
+```
+@misc{hamdan2025fleet,
+      title={FLEET: A Federated Learning Emulation and Evaluation Testbed for Holistic Research}, 
+      author={Osama Abu Hamdan and Hao Che and Engin Arslan and Md Arifuzzaman},
+      year={2025},
+      eprint={2509.00621},
+      archivePrefix={arXiv},
+      primaryClass={cs.NI},
+      url={https://arxiv.org/abs/2509.00621}, 
+}
+```
+
+---
 ## ⚡ Quickstart  
 
 ### Prerequisites
-- Ubuntu (tested on Ubuntu 22.04)  
+- Unix System (tested on Ubuntu 22.04)  
 - [Open vSwitch](https://docs.openvswitch.org/en/latest/intro/install/distributions/)
 - [Docker](https://docs.docker.com/engine/install/)
 - Python 3.10+
@@ -47,9 +63,11 @@ bash config.sh
 
 This script will:
 
+* Double check required dependencies.
 * Create a Python virtual environment (`.venv/`).
 * Install Python dependencies.
-* Install Containernet with Pip
+* Install a proper PyTorch version (CPU or GPU)
+* Install Containernet.
 * Build Docker images required for the testbed.
 
 #### 2️⃣ Manual Setup
@@ -67,6 +85,28 @@ If you prefer to configure things manually:
 
    ```bash
    pip install -r requirements.txt
+   ```
+3. **Install PyTorch:**
+
+   **PyTorch CPU** and **PyTorch CUDA** are two versions of the PyTorch library that differ in where computations are performed; on the system's CPU or on an NVIDIA GPU via CUDA.
+
+   **Comparison**:
+
+   | Feature              | PyTorch CPU                  | PyTorch CUDA                    |
+   |----------------------|------------------------------|---------------------------------|
+   | **Computation**      | Runs on the CPU              | Runs on NVIDIA GPUs using CUDA  |
+   | **Install Size**     | Lighter (~200 MB)            | Heavier (800 MB or more)        |
+   | **Hardware Needed**  | Works on any system          | Requires NVIDIA GPU + drivers   |
+
+   If you have a CPU-only machine, install PyTroch CPU with:
+
+   ```bash
+   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+   ```
+
+   If you have a machine with an NVIDIA GPU, install PyTroch Cuda with:
+   ```bash
+   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
    ```
 
 3. **Install Containernet:**
@@ -150,24 +190,6 @@ sudo ./venv/bin/mn -c
 
 ---
 
-## 📚 Reference
-
-If you use this testbed in your research, please cite our work:
-
-```
-@misc{hamdan2025fleet,
-      title={FLEET: A Federated Learning Emulation and Evaluation Testbed for Holistic Research}, 
-      author={Osama Abu Hamdan and Hao Che and Engin Arslan and Md Arifuzzaman},
-      year={2025},
-      eprint={2509.00621},
-      archivePrefix={arXiv},
-      primaryClass={cs.NI},
-      url={https://arxiv.org/abs/2509.00621}, 
-}
-```
-
----
-
 ## 🤝 Contributing
 
 We welcome contributions of all kinds:
@@ -196,4 +218,4 @@ See the [LICENSE](./LICENSE) file for details.
 
 ---
 ## 👤 Maintainers
-This project is developed and maintained by **[Osama Abu Hamdan](https://oabuhadan.com)**.  
+This project is developed and maintained by **[Osama Abu Hamdan](https://oabuhamdan.com)**.  
