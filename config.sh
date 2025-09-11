@@ -10,6 +10,35 @@ FORCE_ALL=false
 FORCE_STEPS=()
 CLEANUP=false
 
+show_help () {
+    cat <<EOF
+Usage: $0 [options]
+
+Options:
+  --force <steps>     Re-run specific steps even if already done.
+                      <steps> can be a comma-separated list:
+                      venv,reqs,torch,containernet,docker
+                      or "all" to force everything.
+
+                      Example:
+                        $0 --force reqs,torch
+                        $0 --force all
+
+  --cleanup            Remove all generated files (virtualenv, docker images)
+  --help, -h           Show this help message and exit
+
+Typical usage:
+  $0                # Run normally, skipping steps already done
+  $0 --force all    # Force all steps to run again
+  $0 --cleanup      # Wipe everything
+EOF
+}
+
+if [[ "$1" == "--help" || "$1" == "-h" ]]; then
+    show_help
+    exit 0
+fi
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --force)
@@ -85,8 +114,8 @@ echo "✅ All required dependencies are installed."
 # -------------------------------
 # 2. Virtual environment
 # -------------------------------
-confirm_step "Creating Python virtual environment"
 if [[ ! -d ".venv" ]] || should_force venv; then
+    confirm_step "Creating Python virtual environment"
     rm -rf .venv
     python3 -m venv .venv
     echo "[+] Virtual environment created."
@@ -98,8 +127,8 @@ source .venv/bin/activate
 # -------------------------------
 # 3. Install Python dependencies
 # -------------------------------
-confirm_step "Installing Python dependencies (excluding torch)"
 if [[ ! -f ".venv/.reqs_done" ]] || should_force reqs; then
+    confirm_step "Installing Python dependencies (excluding torch)"
     if [ -f "requirements.txt" ]; then
         pip install --upgrade pip
         pip install -r requirements.txt
@@ -116,8 +145,8 @@ fi
 # -------------------------------
 # 4. Install Torch
 # -------------------------------
-confirm_step "Installing PyTorch (GPU if available, otherwise CPU)"
 if [[ ! -f ".venv/.torch_done" ]] || should_force torch; then
+    confirm_step "Installing PyTorch (GPU if available, otherwise CPU)"
     if command -v nvidia-smi >/dev/null 2>&1; then
         echo "[+] NVIDIA GPU detected, installing CUDA-enabled torch"
         pip install torch==2.8.0 torchvision==0.23.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cu118
@@ -136,8 +165,8 @@ fi
 # -------------------------------
 # 5. Install Containernet
 # -------------------------------
-confirm_step "Cloning and installing Containernet"
 if [[ ! -f ".venv/.containernet_done" ]] || should_force containernet; then
+    confirm_step "Cloning and installing Containernet"
     git clone https://github.com/containernet/containernet.git /tmp/containernet
     cd /tmp/containernet
     pip install .
@@ -152,8 +181,8 @@ fi
 # -------------------------------
 # 6. Build Docker images
 # -------------------------------
-confirm_step "Building Docker images for FL and BG nodes (needs sudo)"
 if [[ -z $(sudo docker images -q fleet-fl) || -z $(sudo docker images -q fleet-bg) ]] || should_force docker; then
+    confirm_step "Building Docker images for FL and BG nodes (needs sudo)"
     sudo docker build \
         --build-arg TORCH_BASE="$TORCH_BASE" \
         -t fleet-fl -f static/docker/Dockerfile-FL .
