@@ -12,8 +12,6 @@ from common.loggers import info
 from common.static import *
 from containernet_code.config import NetConfig, TopologyConfig
 
-# Constants
-
 class TopoProcessor:
     """Base class for processing topologies."""
     NO_BG_WARNING = ("Warning: link {src} -> {dst} does not have a Link Utilization config."
@@ -358,7 +356,7 @@ class TopologyHandler:
         absolute_path = os.getcwd()
         return {
             "volumes": [
-                f"{absolute_path}/{log_path}",
+                f"{absolute_path}/{log_path}:{CONTAINER_LOG_PATH}",
                 f"{absolute_path}/{LOCAL_DATA_PATH}:{CONTAINER_DATA_PATH}",
                 f"{absolute_path}/{LOCAL_SCRIPTS_PATH}:{CONTAINER_SCRIPTS_PATH}",
                 f"{absolute_path}/{LOCAL_RESOLVED_CONFIG_PATH}:{CONTAINER_RESOLVED_CONFIG_PATH}"
