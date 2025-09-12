@@ -15,7 +15,7 @@ class ServerConfig:
     num_rounds: int = 1
     fraction_fit: float = 1
     fraction_evaluate: float = 1
-    server_evaluation: bool = False
+    server_eval: bool = False
     val_batch_size: int = 128
     server_param_init: bool = True
     stop_by_accuracy: bool = False
