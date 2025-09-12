@@ -359,7 +359,9 @@ class TopologyHandler:
                 f"{absolute_path}/{log_path}:{CONTAINER_LOG_PATH}",
                 f"{absolute_path}/{LOCAL_DATA_PATH}:{CONTAINER_DATA_PATH}",
                 f"{absolute_path}/{LOCAL_SCRIPTS_PATH}:{CONTAINER_SCRIPTS_PATH}",
-                f"{absolute_path}/{LOCAL_RESOLVED_CONFIG_PATH}:{CONTAINER_RESOLVED_CONFIG_PATH}"
+                f"{absolute_path}/{LOCAL_RESOLVED_CONFIG_PATH}:{CONTAINER_RESOLVED_CONFIG_PATH}",
+                "/etc/localtime:/etc/localtime:ro",
+                "/etc/timezone:/etc/timezone:ro"
             ],
             "sysctls": {"net.ipv4.tcp_congestion_control": "cubic"},
             "cls": Docker
