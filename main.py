@@ -24,8 +24,8 @@ from flcode_pytorch.utils.configs import ServerConfig, ClientConfig
 
 @dataclass
 class MainConfig:
-    exp_name: str = "exp1"
-    log_dir: str = LOCAL_LOG_PATH
+    exp_name: str
+    log_dir: str
     fl_server: ServerConfig = field(default_factory=ServerConfig)
     fl_client: ClientConfig = field(default_factory=ClientConfig)
     dataset: DatasetConfig = field(default_factory=DatasetConfig)
@@ -42,7 +42,7 @@ cs.store(name="base_main", node=MainConfig)
 def main(cfg: MainConfig):
     OmegaConf.save(cfg, LOCAL_RESOLVED_CONFIG_PATH)  # save resolved config for FL and BG containers
     log_path = Path(cfg.log_dir)
-    configure_logger("default", log_to_stream=False, log_file=f"{log_path}/net.log", level="INFO")
+    configure_logger("default", log_to_stream=True, log_file=f"{log_path}/net.log", level="INFO")
 
     prepare_datasets(cfg.dataset)
     controller = None
