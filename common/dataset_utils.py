@@ -1,16 +1,21 @@
+import shutil
 from dataclasses import field, dataclass
 from pathlib import Path
+from typing import Union, Optional
 
 import datasets
-import hydra
-from datasets import get_dataset_split_names
+from datasets import get_dataset_split_names, DatasetDict, Dataset
 from flwr_datasets import FederatedDataset
 from flwr_datasets import partitioner
 from torch.utils.data import DataLoader
 from torchvision.transforms import transforms
-from transformers import AutoTokenizer
 
-from common.loggers import configure_logger, warning
+from common.loggers import warning, info
+
+WARNING_RECREATE_MESSAGE = (
+    f"You can recreate the dataset by setting the force_create to true.\n"
+    f"Returning None."
+)
 
 
 @dataclass
@@ -21,7 +26,9 @@ class DatasetConfig:
     partitioner_kwargs: dict = field(default_factory=dict)
     force_create: bool = False
     test_size: float = 0.2
-    fed_eval: bool = True
+    server_eval: bool = True
+    train_split_key: str = "train"
+    test_split_key: str = "test"
 
 
 def _process_dataset_name(name):
@@ -32,81 +39,93 @@ def _process_dataset_name(name):
 def prepare_datasets(cfg: DatasetConfig):
     clean_name = _process_dataset_name(cfg.name)
     data_path = f"{cfg.path}/{clean_name}"
-    if not cfg.force_create and Path(data_path).exists():
+    if Path(data_path).exists():
+        if cfg.force_create:
+            info("Removing existing dataset at '{data_path}' as 'force_create' is True.")
+            shutil.rmtree(data_path)
+        else:
+            info(f"Dataset '{cfg.name}' already exists at '{data_path}'.")
         return
     partitioner_cls = getattr(partitioner, cfg.partitioner_cls_name)
     partitioner_instance = partitioner_cls(**cfg.partitioner_kwargs)
 
     splits = get_dataset_split_names(cfg.name)
-    if not cfg.fed_eval and "test" not in splits:
-        warning("Dataset does not have a 'test' split. Switching to federated testing.")
-        fed_eval = True
+    if cfg.server_eval and "test" not in splits:
+        warning("Dataset does not have a 'test' split. Server evaluation will be skipped.")
+        cfg.server_eval = False
 
-    partitioners = {"train": partitioner_instance} if cfg.fed_eval else {"train": partitioner_instance, "test": 1}
+    partitioners = {"train": partitioner_instance}
+    if cfg.server_eval:
+        partitioners["test"] = 1
+
     fds = FederatedDataset(dataset=cfg.name, partitioners=partitioners)
-    if cfg.fed_eval:
-        for partition_id in range(partitioner_instance.num_partitions):
-            partition = fds.load_partition(partition_id)
-            partition = partition.train_test_split(test_size=cfg.test_size)
-            partition.save_to_disk(f"{data_path}/{partition_id + 1}")
-    else:
+    if cfg.server_eval:
         testset = fds.load_split("test")
         testset.save_to_disk(f"{data_path}/server_eval")
         for partition_id in range(partitioner_instance.num_partitions):
             partition = fds.load_partition(partition_id, "train")
             partition.save_to_disk(f"{data_path}/{partition_id + 1}")
+    else:
+        for partition_id in range(partitioner_instance.num_partitions):
+            partition = fds.load_partition(partition_id)
+            partition = partition.train_test_split(test_size=cfg.test_size)
+            partition.save_to_disk(f"{data_path}/{partition_id + 1}")
 
 
-def get_partition(path, name, partition_id):
+def get_partition(path, name, partition_id) -> Optional[Union[Dataset, DatasetDict]]:
     name = _process_dataset_name(name)
     data_path = f"{path}/{name}"
-    assert Path(data_path).exists(), "Dataset does not exist."
 
-    partition = datasets.load_from_disk(f"{data_path}/{partition_id}")
+    partition: Union[Dataset, DatasetDict] = datasets.load_from_disk(f"{data_path}/{partition_id}")
+    if partition is None:
+        warning(f"Dataset '{name}' not found at '{data_path}'.\n{WARNING_RECREATE_MESSAGE}")
+        return None
     return partition
 
 
-def process_img_dataset(dataset, img_key="img", extra_transforms=None):
-    all_transforms = [transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))]
-    if extra_transforms:
-        all_transforms.extend(extra_transforms)
+def get_train_dataset(path, name, partition_id, key) -> Dataset:
+    dataset = get_partition(path, name, partition_id)
+    assert dataset, f"Dataset '{name}' not found at '{path}'.\n{WARNING_RECREATE_MESSAGE}"
 
-    transformer = transforms.Compose(all_transforms)
+    if isinstance(dataset, DatasetDict):
+        assert key in dataset, f"Key '{key}' not found in dataset '{name}'."
+        dataset = dataset[key]
 
-    def apply_transforms(batch):
-        batch[img_key] = [transformer(img) for img in batch[img_key]]
-        return batch
-
-    dataset = dataset.with_transform(apply_transforms)
+    info("Returning the whole dataset as it does not have splits.")
     return dataset
 
 
-def process_text_dataset(dataset, text_key, tokenizer=None, **tokenizer_kwargs):
-    tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased") if tokenizer is None else tokenizer
-
-    def apply_tokenizer(batch):
-        batch[text_key] = [tokenizer(text, **tokenizer_kwargs) for text in batch[text_key]]
-        return batch
-
-    dataset = dataset.with_transform(apply_tokenizer)
-    return dataset
-
-
-def get_dataloader(dataset_path, dataset_name, partition_id, batch_process=None,
-                   dataset_type="img", split="train", batch_size=32, **dataloader_kwargs):
-    dataset = get_partition(dataset_path, dataset_name, partition_id)
-    if split not in dataset:
-        warning(f"Split '{split}' not found in the dataset. Available splits: {dataset.keys()}")
+def get_test_dataset(path, name, partition_id, key=None) -> Optional[Dataset]:
+    dataset = get_partition(path, name, partition_id)
+    if not dataset:
         return None
 
-    dataset = dataset[split]
-    if dataset_type == "img":
-        dataset = process_img_dataset(dataset, img_key="img", extra_transforms=batch_process)
-    elif dataset_type == "text":
-        dataset = process_text_dataset(dataset, text_key="text", tokenizer=batch_process)
+    if partition_id == "server_eval":
+        return dataset
 
-    return DataLoader(dataset, batch_size=batch_size, **dataloader_kwargs)
+    if isinstance(dataset, DatasetDict) and key in dataset:
+        return dataset[key]
 
+    return None
+
+
+def get_dataloader(dataset: Dataset, transform, batch_size: int, **dataloader_kwargs) -> DataLoader:
+    dataset = dataset.with_transform(transform)
+    dataloader = DataLoader(dataset, batch_size=batch_size, **dataloader_kwargs)
+    return dataloader
+
+
+def basic_img_transform():
+    img_transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    ])
+
+    def apply(batch):
+        batch["img"] = [img_transform(row) for row in batch["img"]]
+        return batch
+
+    return apply
 
 # @hydra.main(config_path="../static/config/dataset", config_name="default", version_base=None)
 # def script_call(cfg: DatasetConfig):

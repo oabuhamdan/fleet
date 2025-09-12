@@ -7,7 +7,7 @@ import torch
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context, Config, Scalar
 
-from common.dataset_utils import get_dataloader, DatasetConfig
+from common.dataset_utils import DatasetConfig, get_dataloader, get_train_dataset, get_test_dataset, basic_img_transform
 from common.loggers import init_zmq, configure_logger, info, debug, warning, to_zmq
 from common.static import CONTAINER_LOG_PATH, CONTAINER_DATA_PATH, CONTAINER_RESOLVED_CONFIG_PATH
 from .utils import client_metrics_utils
@@ -18,11 +18,11 @@ from .utils.model_utils import Net, get_weights, set_weights, test, train
 
 
 class FlowerClient(NumPyClient):
-    def __init__(self, ctx: ClientContext, net, trainloader, valloader, metrics_collector):
+    def __init__(self, ctx: ClientContext, net, train_dataloader, eval_dataloader, metrics_collector):
         self.ctx = ctx
         self.net = net
-        self.trainloader = trainloader
-        self.valloader = valloader
+        self.train_dataloader = train_dataloader
+        self.eval_dataloader = eval_dataloader
         self.metrics_collector: MetricsCollector = metrics_collector
 
     def fit(self, parameters, config):
@@ -38,7 +38,7 @@ class FlowerClient(NumPyClient):
 
         loss = train(
             self.net,
-            self.trainloader,
+            self.train_dataloader,
             self.ctx.device,
             optim,
             loss_fn,
@@ -55,11 +55,11 @@ class FlowerClient(NumPyClient):
         )
         debug(f"Training Metrics: {metrics}")
         info(f"Finished Training - Round {config['server-round']}")
-        return get_weights(self.net), len(self.trainloader.dataset), metrics
+        return get_weights(self.net), len(self.train_dataloader.dataset), metrics
 
     def evaluate(self, parameters, config):
         """Evaluate the model on the data this client has."""
-        if not self.valloader:
+        if not self.eval_dataloader:
             warning("No validation data found, returning 0.0 for loss")
             return 0.0, 0, {}
 
@@ -68,7 +68,7 @@ class FlowerClient(NumPyClient):
         info(f"Starting Evaluation - Round {config['server-round']}")
         loss, accuracy = test(
             self.net,
-            self.valloader,
+            self.eval_dataloader,
             self.ctx.device,
             input_key="img",
             target_key="label",
@@ -82,7 +82,7 @@ class FlowerClient(NumPyClient):
         )
         debug(f"Eval Metrics: {metrics}")
         info(f"Finished Evaluation - Round {config['server-round']}")
-        return loss, len(self.valloader.dataset), metrics
+        return loss, len(self.eval_dataloader.dataset), metrics
 
     def get_properties(self, config: Config) -> dict[str, Scalar]:
         result = OrderedDict()
@@ -94,7 +94,7 @@ class FlowerClient(NumPyClient):
         elif props_type == "metrics" and self.metrics_collector:
             result.update(self.metrics_collector.get_metrics(aggregation=metrics_agg))
         elif props_type == "dataset":
-            result.update(client_metrics_utils.get_dataset_info(self.trainloader, self.valloader))
+            result.update(client_metrics_utils.get_dataset_info(self.train_dataloader, self.eval_dataloader))
         debug(f"Properties: {result}")
         return result
 
@@ -115,16 +115,22 @@ def init_client(context: Context):
         device=device
     )
 
-    trainloader = get_dataloader(
-        CONTAINER_DATA_PATH, dataset_cfg.name,
-        simple_id, batch_size=client_cfg.train_batch_size,
-        split="train", shuffle=True
+    train_dataset = get_train_dataset(CONTAINER_DATA_PATH, dataset_cfg.name, simple_id, key=dataset_cfg.train_split_key)
+    train_loader = get_dataloader(
+        train_dataset,
+        transform=basic_img_transform(),
+        batch_size=client_cfg.train_batch_size,
+        shuffle=True,
     )
 
-    valloader = get_dataloader(
-        CONTAINER_DATA_PATH, dataset_cfg.name, simple_id,
-        batch_size=client_cfg.val_batch_size, split="test"
-    )
+    eval_dataset = get_test_dataset(CONTAINER_DATA_PATH, dataset_cfg.name, simple_id, key=dataset_cfg.test_split_key)
+    eval_loader = None
+    if eval_dataset:
+        eval_loader = get_dataloader(
+            eval_dataset,
+            transform=basic_img_transform(),
+            batch_size=client_cfg.val_batch_size,
+        )
 
     if client_cfg.zmq["enable"]:
         init_zmq("default", client_cfg.zmq["host"], client_cfg.zmq["port"])
@@ -143,7 +149,7 @@ def init_client(context: Context):
         )
 
     model = Net()
-    return FlowerClient(ctx, model, trainloader, valloader, metrics_collector)
+    return FlowerClient(ctx, model, train_loader, eval_loader, metrics_collector)
 
 
 def client_fn(context: Context):

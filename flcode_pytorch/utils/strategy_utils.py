@@ -6,9 +6,10 @@ from flwr.server import strategy
 from flwr.server.strategy import Strategy
 from torch import nn
 
+from common.loggers import warning
 from common.static import CONTAINER_DATA_PATH
 from flcode_pytorch.utils.contexts import ServerContext
-from common.dataset_utils import get_dataloader
+from common.dataset_utils import get_dataloader, get_test_dataset, basic_img_transform
 from flcode_pytorch.utils.model_utils import get_weights, set_weights, test
 
 
@@ -37,14 +38,20 @@ def get_aggregation_fn(metrics_agg_map: dict[str, str]) -> callable:
 
 
 def get_evaluate_fn(ctx, model):
-    valloader = get_dataloader(
-        CONTAINER_DATA_PATH, ctx.dataset_cfg.name,
-        "server_eval", batch_size=ctx.server_cfg.val_batch_size, split="test"
+    server_eval_dataset = get_test_dataset(CONTAINER_DATA_PATH, ctx.dataset_cfg.name, "server_eval")
+    if not server_eval_dataset:
+        warning("Server evaluation dataset not found. Skipping server evaluation.")
+        return None
+
+    server_eval_dataloader = get_dataloader(
+        server_eval_dataset,
+        transform=basic_img_transform(),
+        batch_size=ctx.server_cfg.val_batch_size
     )
 
     def evaluate(server_round, parameters, configs):
         set_weights(model, parameters)
-        loss, accuracy = test(model, valloader, ctx.device)
+        loss, accuracy = test(model, server_eval_dataloader, ctx.device, input_key="img", target_key="label")
         return loss, {"loss": loss, "accuracy": accuracy}
 
     return evaluate
@@ -59,7 +66,7 @@ def get_strategy(ctx: ServerContext, model: nn.Module) -> Strategy:
     fit_metrics_aggregation_fn = get_aggregation_fn({"loss": "average"})
     evaluate_metrics_aggregation_fn = get_aggregation_fn({"accuracy": "weighted_average", "loss": "average"})
     parameters = ndarrays_to_parameters(get_weights(model)) if ctx.server_cfg.server_param_init else None
-    evaluate_fn = get_evaluate_fn(ctx, model) if ctx.server_cfg.server_evaluation else None
+    evaluate_fn = get_evaluate_fn(ctx, model) if ctx.server_cfg.server_eval else None
     strategy_class = getattr(strategy, ctx.server_cfg.strategy)
     strategy_kwargs = ctx.server_cfg.extra.get("strategy_kwargs", {})
     return strategy_class(
