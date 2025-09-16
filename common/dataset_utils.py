@@ -1,5 +1,4 @@
 import shutil
-from dataclasses import field, dataclass
 from pathlib import Path
 from typing import Union, Optional
 
@@ -10,25 +9,13 @@ from flwr_datasets import partitioner
 from torch.utils.data import DataLoader
 from torchvision.transforms import transforms
 
+from common.configs import DatasetConfig
 from common.loggers import warning, info
 
 WARNING_RECREATE_MESSAGE = (
     f"You can recreate the dataset by setting the force_create to true.\n"
     f"Returning None."
 )
-
-
-@dataclass
-class DatasetConfig:
-    path: str = "static/data"
-    name: str = "cifar10"
-    partitioner_cls_name: str = "IidPartitioner"
-    partitioner_kwargs: dict = field(default_factory=dict)
-    force_create: bool = False
-    test_size: float = 0.2
-    server_eval: bool = True
-    train_split_key: str = "train"
-    test_split_key: str = "test"
 
 
 def _process_dataset_name(name):

@@ -3,13 +3,12 @@ from typing import NamedTuple
 import torch
 from flwr.common import Context
 
-from common.dataset_utils import DatasetConfig
-from flcode_pytorch.utils.configs import ServerConfig, ClientConfig
+from common.configs import FLServerConfig, FLClientConfig, DatasetConfig
 
 
 class ServerContext(NamedTuple):
     flwr_ctx: Context
-    server_cfg: ServerConfig
+    server_cfg: FLServerConfig
     dataset_cfg: DatasetConfig
     device: torch.device
 
@@ -17,6 +16,6 @@ class ServerContext(NamedTuple):
 class ClientContext(NamedTuple):
     simple_id: int
     flwr_ctx: Context
-    client_cfg: ClientConfig
+    client_cfg: FLClientConfig
     dataset_cfg: DatasetConfig
     device: torch.device

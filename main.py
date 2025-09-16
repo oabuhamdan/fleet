@@ -8,26 +8,25 @@ from mininet.node import OVSSwitch, RemoteController
 from mininet.link import TCLink  # always keep this import after OVSSwitch
 from omegaconf import OmegaConf
 
-from common.dataset_utils import prepare_datasets, DatasetConfig
+from common.dataset_utils import prepare_datasets
 from common.loggers import configure_logger
 from common.static import *
 from containernet_code.background_traffic.background_gen import BGTrafficRunner
 from containernet_code.background_traffic.traffic_generators import BGTrafficGenerators
 from containernet_code.background_traffic.traffic_patterns import BGTrafficPatterns
-from containernet_code.config import NetConfig, SDNConfig, BGConfig
 from containernet_code.experiment_runner import ExperimentRunner
 from containernet_code.my_containernet import MyContainernet
 from containernet_code.my_topology import TopologyHandler
 from common.utils import plot_topology
-from flcode_pytorch.utils.configs import ServerConfig, ClientConfig
+from common.configs import FLServerConfig, FLClientConfig, BGConfig, SDNConfig, NetConfig, DatasetConfig
 
 
 @dataclass
 class MainConfig:
     exp_name: str
     log_dir: str
-    fl_server: ServerConfig = field(default_factory=ServerConfig)
-    fl_client: ClientConfig = field(default_factory=ClientConfig)
+    fl_server: FLServerConfig = field(default_factory=FLServerConfig)
+    fl_client: FLClientConfig = field(default_factory=FLClientConfig)
     dataset: DatasetConfig = field(default_factory=DatasetConfig)
     sdn: SDNConfig = field(default_factory=SDNConfig)
     bg: BGConfig = field(default_factory=BGConfig)

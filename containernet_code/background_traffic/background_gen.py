@@ -7,7 +7,7 @@ from common.loggers import info
 from common.static import BG_NAME_FORMAT
 from .traffic_generators import TrafficGenerator
 from .traffic_patterns import TrafficPattern
-from ..config import BGConfig
+from common.configs import BGConfig
 
 
 # Main BGTrafficGenerator Class

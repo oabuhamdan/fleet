@@ -3,19 +3,18 @@ import torch
 from flwr.common import Context
 from flwr.server import ServerApp, ServerAppComponents
 
-from common.dataset_utils import DatasetConfig
 from common.loggers import *
 from common.static import CONTAINER_LOG_PATH, CONTAINER_RESOLVED_CONFIG_PATH
 from flcode_pytorch.utils.contexts import ServerContext
 from .my_client_manager import MyClientManager
 from .my_server import MyServer
-from .utils.configs import ServerConfig, get_configs_from_file
+from common.configs import FLServerConfig, get_configs_from_file, DatasetConfig
 from .utils.model_utils import Net
 from .utils.strategy_utils import get_strategy
 
 
 def server_fn(context: Context) -> ServerAppComponents:
-    server_cfg: ServerConfig = get_configs_from_file(CONTAINER_RESOLVED_CONFIG_PATH, "fl_server", ServerConfig)
+    server_cfg: FLServerConfig = get_configs_from_file(CONTAINER_RESOLVED_CONFIG_PATH, "fl_server", FLServerConfig)
     dataset_cfg: DatasetConfig = get_configs_from_file(CONTAINER_RESOLVED_CONFIG_PATH, "dataset", DatasetConfig)
     log_file = Path(CONTAINER_LOG_PATH) / "server.log"
     if server_cfg.zmq["enable"]:

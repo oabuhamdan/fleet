@@ -10,7 +10,8 @@ from mininet.topo import Topo
 
 from common.loggers import info
 from common.static import *
-from containernet_code.config import NetConfig, TopologyConfig
+from common.configs import TopologyConfig, NetConfig
+
 
 class TopoProcessor:
     """Base class for processing topologies."""

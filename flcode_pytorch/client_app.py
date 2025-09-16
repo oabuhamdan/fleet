@@ -7,12 +7,12 @@ import torch
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context, Config, Scalar
 
-from common.dataset_utils import DatasetConfig, get_dataloader, get_train_dataset, get_test_dataset, basic_img_transform
+from common.dataset_utils import get_dataloader, get_train_dataset, get_test_dataset, basic_img_transform
 from common.loggers import init_zmq, configure_logger, info, debug, warning, to_zmq
 from common.static import CONTAINER_LOG_PATH, CONTAINER_DATA_PATH, CONTAINER_RESOLVED_CONFIG_PATH
 from .utils import client_metrics_utils
 from .utils.client_metrics_utils import MetricsCollector
-from .utils.configs import ClientConfig, get_configs_from_file
+from common.configs import FLClientConfig, get_configs_from_file, DatasetConfig
 from .utils.contexts import ClientContext
 from .utils.model_utils import Net, get_weights, set_weights, test, train
 
@@ -100,7 +100,7 @@ class FlowerClient(NumPyClient):
 
 
 def init_client(context: Context):
-    client_cfg: ClientConfig = get_configs_from_file(CONTAINER_RESOLVED_CONFIG_PATH, "fl_client", ClientConfig)
+    client_cfg: FLClientConfig = get_configs_from_file(CONTAINER_RESOLVED_CONFIG_PATH, "fl_client", FLClientConfig)
     dataset_cfg: DatasetConfig = get_configs_from_file(CONTAINER_RESOLVED_CONFIG_PATH, "dataset", DatasetConfig)
     simple_id = context.node_config["cid"]
     log_file = Path(CONTAINER_LOG_PATH) / f"client_{context.node_config['cid']}.log"
