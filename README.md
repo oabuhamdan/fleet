@@ -37,6 +37,12 @@ If you use this testbed in your research, please cite our work:
       url={https://arxiv.org/abs/2509.00621}, 
 }
 ```
+---
+
+## 📝 FLEET Tutorial
+
+A complete tutorial for FLEET is available as a series of blog posts here:
+[(FLEET Blog)](https://www.oabuhamdan.com/blog/?tag=FLEET )
 
 ---
 ## ⚡ Quickstart  
