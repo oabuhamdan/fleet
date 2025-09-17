@@ -5,6 +5,7 @@ import random
 from typing import Dict, List, Optional, Iterator, Any, Type
 
 import topohub.mininet
+from docker.types import DeviceRequest
 from mininet.node import Docker
 from mininet.topo import Topo
 
@@ -321,6 +322,7 @@ class TopologyHandler:
                 ip=ip, mac=self._ip_to_mac(ip),
                 dimage=self.net_cfg.fl.image,
                 **self._get_container_commons(self.log_path),
+                **self._get_gpu_configs(),
                 **next(limits_generator)
             )
 
@@ -366,6 +368,13 @@ class TopologyHandler:
             ],
             "sysctls": {"net.ipv4.tcp_congestion_control": "cubic"},
             "cls": Docker
+        }
+
+    @staticmethod
+    def _get_gpu_configs() -> Dict:
+        """Return NVIDIA GPU configuration parameters."""
+        return {
+            "device_requests": [DeviceRequest(count=-1, capabilities=[['gpu']])],
         }
 
     @staticmethod
