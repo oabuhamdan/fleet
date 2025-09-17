@@ -53,6 +53,8 @@ A complete tutorial for FLEET is available as a series of blog posts here:
 - [Docker](https://docs.docker.com/engine/install/)
 - Python 3.10+
 - Python Venv
+- Git
+- [Nvidia Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) (if using GPU)
 
 ### Installation
 ```bash
