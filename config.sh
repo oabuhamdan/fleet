@@ -167,7 +167,7 @@ fi
 # -------------------------------
 if [[ ! -f ".venv/.containernet_done" ]] || should_force containernet; then
     confirm_step "Cloning and installing Containernet"
-    git clone https://github.com/containernet/containernet.git /tmp/containernet
+    git clone https://github.com/oabuhamdan/containernet.git /tmp/containernet
     cd /tmp/containernet
     pip install .
     cd -
@@ -181,8 +181,8 @@ fi
 # -------------------------------
 # 6. Build Docker images
 # -------------------------------
+confirm_step "Building Docker images for FL and BG nodes (needs sudo)"
 if [[ -z $(sudo docker images -q fleet-fl) || -z $(sudo docker images -q fleet-bg) ]] || should_force docker; then
-    confirm_step "Building Docker images for FL and BG nodes (needs sudo)"
     sudo docker build \
         --build-arg TORCH_BASE="$TORCH_BASE" \
         -t fleet-fl -f static/docker/Dockerfile-FL .
