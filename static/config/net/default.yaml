@@ -5,16 +5,14 @@ topology:
   extra: { }
 
 fl:
-  clients_number: 10
-  server_placement: "highest_degree"
-  client_placement: "lowest_degree"
-  image: "fl-mininet:latest"
+  clients_number: 3
+  image: "fleet-fl:latest"
   network: "10.0.0.0/16"
   extra: { }
 
 bg:
   enabled: false
-  image: "bg-mininet:latest"
+  image: "fleet-bg:latest"
   network: "10.1.0.0/16"
   extra: { }
 
