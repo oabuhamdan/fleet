@@ -87,9 +87,9 @@ class BGConfig:
     image: str = "bg-traffic:latest"
     network: str = "10.1.0.0/16"
     clients_limits: Dict = field(default_factory=lambda: {"cpu": 0.5, "mem": 256})
-    generator_config: Dict = field(default_factory=lambda: {"name": "iperf"})
-    pattern_config: Dict = field(default_factory=lambda: {"name": "poisson", "parallel_streams": 1,
-                                                          "max_rate": 100.0, "min_rate": 1.0})
+    rate_distribution: Dict = field(default_factory=lambda: {"name": "poisson", "parallel_streams": 1})
+    time_distribution: Dict = field(default_factory=lambda: {"name": "poisson"})
+    generator: Dict = field(default_factory=lambda: {"name": "iperf"})
     extra: Dict = field(default_factory=dict)
 
 
