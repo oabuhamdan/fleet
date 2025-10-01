@@ -2,6 +2,7 @@ import ipaddress
 import itertools
 import os
 import random
+import subprocess
 from typing import Dict, List, Optional, Iterator, Any, Type
 
 import topohub.mininet
@@ -252,10 +253,11 @@ class TopologyHandler:
         super().__init__(*args, **kwargs)
         self.net_cfg = net_cfg
         self.log_path = log_path
-        self.topo = self._load_topology()
         self.fl_server: Optional[str] = None
         self.fl_clients: List[str] = []
         self.bg_clients: List[str] = []
+        self.gpu_available = self.check_gpu_available()
+        self.topo = self._load_topology()
         self.setup_fl_components()
 
     def _load_topology(self) -> Topo:
@@ -282,7 +284,7 @@ class TopologyHandler:
             else:
                 bg_network_hosts = ipaddress.ip_network(self.net_cfg.bg.network).hosts()
             self._create_background_hosts(bg_network_hosts)
-        print(f"Topology built: {len(self.topo.switches())} switches, {len(self.topo.links())} links")
+        info(f"Topology built: {len(self.topo.switches())} switches, {len(self.topo.links())} links")
 
     def _create_fl_server(self, fl_network_hosts) -> str:
         """Create FL server and connect it to the network."""
@@ -370,12 +372,21 @@ class TopologyHandler:
             "cls": Docker
         }
 
-    @staticmethod
-    def _get_gpu_configs() -> Dict:
-        """Return NVIDIA GPU configuration parameters."""
+    def _get_gpu_configs(self) -> Dict:
         return {
             "device_requests": [DeviceRequest(count=-1, capabilities=[['gpu']])],
-        }
+        } if self.gpu_available else {}
+
+    @staticmethod
+    def check_gpu_available() -> bool:
+        """Check if NVIDIA GPU is available."""
+        try:
+            subprocess.check_output(['nvidia-smi'])
+            info("NVIDIA GPU detected, enabling GPU support for FL clients.")
+            return True
+        except FileNotFoundError:
+            info("NVIDIA GPU not detected or nvidia-smi not found, running without GPU support.")
+            return False
 
     @staticmethod
     def _ip_to_mac(ip: str) -> str:
