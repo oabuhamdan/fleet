@@ -18,7 +18,6 @@ class ExperimentRunner:
         self.running = False
         self.nodes_setup = False
         self.ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-        self._monitor_thread = None
         # Track running services: {host: [service_names]}
         self.running_services: Dict[Host, List[tuple[str, int]]] = defaultdict(list)
 
@@ -80,9 +79,8 @@ class ExperimentRunner:
         if not self.running:
             print("No experiment running")
             return
-        self._stop_all()
-        self._stop_monitoring_thread()
         self.running = False
+        self._stop_all()
         print("Experiment stopped")
 
     def _stop_all(self):
@@ -151,15 +149,7 @@ class ExperimentRunner:
                 time.sleep(5)  # Check every 5 seconds
 
         """Monitor flwr-serverapp and auto-stop experiment when it completes"""
-        self._stop_monitoring = False
-        self._monitor_thread = threading.Thread(target=_monitor_serverapp, daemon=True)
-        self._monitor_thread.start()
-
-    def _stop_monitoring_thread(self):
-        """Stop the monitoring thread"""
-        self._stop_monitoring = True
-        if self._monitor_thread and self._monitor_thread.is_alive() and threading.current_thread() != self._monitor_thread:
-            self._monitor_thread.join(timeout=1)
+        threading.Thread(target=_monitor_serverapp, daemon=True).start()
 
     def _get_last_service(self, host):
         """Get the last (most recent) service for a host"""
