@@ -54,7 +54,7 @@ class IperfGenerator(TrafficGenerator):
 
     def __init__(self, cfg, log_path, **kwargs):
         super().__init__(cfg, log_path)
-        self.pattern = kwargs["pattern"]
+        self.rate_dist, self.intervals_dist = kwargs["pattern"]
         self.log_path = log_path
         self.port = cfg.get("base_port", 5000)
         self.p_streams = cfg.get("parallel_streams", 1)
@@ -64,8 +64,8 @@ class IperfGenerator(TrafficGenerator):
     def init_stream(self, src: Host, dst: Host, rate: float, stream_id: str):
         """Start a background traffic flow with dynamic rate changes."""
         port = self.port
-        rates = self.pattern.rate_dist.generate(rate) // self.p_streams
-        intervals = self.pattern.time_dist.generate(max(rate // 10, 5))  # scale time with rate
+        rates = self.rate_dist.generate(rate) // self.p_streams
+        intervals = self.intervals_dist.generate(max(rate // 10, 5))  # scale time with rate
         self._write_rates_file(src, stream_id, rates, intervals)
         stream_info = BGStreamInfo(stream_id, src, dst, port, self.p_streams, rates, intervals)
         self.streams[stream_id] = stream_info
