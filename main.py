@@ -8,17 +8,17 @@ from mininet.node import OVSSwitch, RemoteController
 from mininet.link import TCLink  # always keep this import after OVSSwitch
 from omegaconf import OmegaConf
 
+from common.configs import FLServerConfig, FLClientConfig, BGConfig, SDNConfig, NetConfig, DatasetConfig
 from common.dataset_utils import prepare_datasets
-from common.loggers import configure_logger
+from common.loggers import configure_logger, info
 from common.static import *
+from common.utils import plot_topology
 from containernet_code.background_traffic.background_gen import BGTrafficRunner
-from containernet_code.background_traffic.traffic_generators import BGTrafficGenerators
-from containernet_code.background_traffic.traffic_patterns import BGTrafficPatterns
+from containernet_code.background_traffic.traffic_generators import get_traffic_generator
+from containernet_code.background_traffic.traffic_patterns import  get_traffic_pattern
 from containernet_code.experiment_runner import ExperimentRunner
 from containernet_code.my_containernet import MyContainernet
 from containernet_code.my_topology import TopologyHandler
-from common.utils import plot_topology
-from common.configs import FLServerConfig, FLClientConfig, BGConfig, SDNConfig, NetConfig, DatasetConfig
 
 
 @dataclass
@@ -28,8 +28,6 @@ class MainConfig:
     fl_server: FLServerConfig = field(default_factory=FLServerConfig)
     fl_client: FLClientConfig = field(default_factory=FLClientConfig)
     dataset: DatasetConfig = field(default_factory=DatasetConfig)
-    sdn: SDNConfig = field(default_factory=SDNConfig)
-    bg: BGConfig = field(default_factory=BGConfig)
     net: NetConfig = field(default_factory=NetConfig)
 
 
@@ -45,19 +43,22 @@ def main(cfg: MainConfig):
 
     prepare_datasets(cfg.dataset)
     controller = None
-    if cfg.sdn.sdn_enabled:
-        controller = RemoteController('c0', ip=cfg.sdn.controller_ip, port=cfg.sdn.controller_port)
+    if cfg.net.sdn.sdn_enabled:
+        sdn_conf = cfg.net.sdn
+        controller = RemoteController('c0', ip=sdn_conf.controller_ip, port=sdn_conf.controller_port)
 
     topo_handler = TopologyHandler(log_path, cfg.net)
     plot_topology(log_path, topo_handler)
 
     background_traffic = None
-    if cfg.bg.enabled:
+    if cfg.net.bg.enabled:
+        bg_conf = cfg.net.bg
+        info("Background traffic generation is enabled.")
         bg_log_path = log_path / "bg_traffic"
         bg_log_path.mkdir(parents=True, exist_ok=True)
-        pattern = BGTrafficPatterns.create(cfg.bg.pattern_config)
-        generator = BGTrafficGenerators.create(cfg.bg.generator_config, log_path=bg_log_path, pattern=pattern)
-        background_traffic = BGTrafficRunner(topo_handler.topo, cfg.bg, generator, pattern, bg_log_path)
+        rate_dist, intervals_dist = get_traffic_pattern(bg_conf.rate_distribution, bg_conf.time_distribution)
+        generator = get_traffic_generator(bg_conf.generator, bg_log_path, pattern=(rate_dist, intervals_dist))
+        background_traffic = BGTrafficRunner(topo_handler.topo, generator, bg_log_path)
 
     experiment_runner = ExperimentRunner(log_path)
     net = MyContainernet(
@@ -66,7 +67,6 @@ def main(cfg: MainConfig):
     )
     net.start()
     CLI(net)
-    experiment_runner.stop_experiment()
     net.stop()
     print("Experiment finished successfully.")
 
