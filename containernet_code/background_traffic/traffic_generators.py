@@ -1,13 +1,12 @@
 # Abstract Traffic Pattern Classes
 import time
-from datetime import datetime, timedelta
-from itertools import cycle
 from pathlib import Path
 from typing import List, Any, Type
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from mininet.node import Host
 
+from common.configs import IDKwargsConfig
 from common.loggers import error, info, configure_logger
 
 LOGGER_NAME = "tg"
@@ -17,8 +16,8 @@ LOGGER_NAME = "tg"
 class TrafficGenerator:
     """Abstract base class for traffic generators."""
 
-    def __init__(self, cfg, log_path, **kwargs):
-        self.cfg = cfg
+    def __init__(self, log_path, cfg_kwargs, **kwargs):
+        self.cfg_kwargs = cfg_kwargs
         self.log_path = log_path
         configure_logger(LOGGER_NAME, log_to_stream=False, log_file=f"{log_path}/traffic_generator.log", level="INFO")
         self.streams = {}
@@ -52,12 +51,12 @@ class BGStreamInfo:
 class IperfGenerator(TrafficGenerator):
     """Iperf3-based traffic generator."""
 
-    def __init__(self, cfg, log_path, **kwargs):
-        super().__init__(cfg, log_path)
+    def __init__(self, cfg_kwargs, log_path, **kwargs):
+        super().__init__(log_path, cfg_kwargs)
         self.rate_dist, self.intervals_dist = kwargs["pattern"]
         self.log_path = log_path
-        self.port = cfg.get("base_port", 5000)
-        self.p_streams = cfg.get("parallel_streams", 1)
+        self.port = cfg_kwargs.get("base_port", 5000)
+        self.p_streams = cfg_kwargs.get("parallel_streams", 1)
         self.streams: dict[str, BGStreamInfo] = {}
         self.scheduler = BackgroundScheduler()
 
@@ -101,11 +100,11 @@ class IperfGenerator(TrafficGenerator):
 class TcpreplayGenerator(TrafficGenerator):
     """TCPreplay-based traffic generator."""
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.pcap_dir = self.cfg.get("pcap_dir", None)
-        self.replay_multiplier = self.cfg.get("replay_multiplier", 1.0)
-        self.replay_loop = self.cfg.get("replay_loop", False)
+    def __init__(self, cfg_kwargs, log_path, **kwargs):
+        super().__init__(log_path, cfg_kwargs, **kwargs)
+        self.pcap_dir = self.cfg_kwargs.get("pcap_dir", None)
+        self.replay_multiplier = self.cfg_kwargs.get("replay_multiplier", 1.0)
+        self.replay_loop = self.cfg_kwargs.get("replay_loop", False)
         self.log_path = Path(self.log_path) / "tcpreplay_logs"
         if not self.pcap_dir:
             raise ValueError("PCAP directory must be specified for TCPreplay")
@@ -169,8 +168,8 @@ TRAFFIC_GENERATORS = {
 }
 
 
-def get_traffic_generator(cfg, log_path, **kwargs) -> TrafficGenerator:
-    generator_name = cfg.get("name", "iperf")
+def get_traffic_generator(cfg: IDKwargsConfig, log_path, **kwargs) -> TrafficGenerator:
+    generator_name = cfg.id
     generator_cls: Type[TrafficGenerator] = TRAFFIC_GENERATORS.get(generator_name, None)
     assert generator_cls, f"Unsupported traffic generator type: {generator_name}"
-    return generator_cls(cfg, log_path, **kwargs)
+    return generator_cls(log_path, cfg.kwargs, **kwargs)

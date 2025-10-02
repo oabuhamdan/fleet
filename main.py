@@ -3,7 +3,6 @@ from pathlib import Path
 
 import hydra
 from hydra.core.config_store import ConfigStore
-from mininet.cli import CLI
 from mininet.node import OVSSwitch, RemoteController
 from mininet.link import TCLink  # always keep this import after OVSSwitch
 from omegaconf import OmegaConf
@@ -56,8 +55,8 @@ def main(cfg: MainConfig):
         info("Background traffic generation is enabled.")
         bg_log_path = log_path / "bg_traffic"
         bg_log_path.mkdir(parents=True, exist_ok=True)
-        rate_dist, intervals_dist = get_traffic_pattern(bg_conf.rate_distribution, bg_conf.time_distribution)
-        generator = get_traffic_generator(bg_conf.generator, bg_log_path, pattern=(rate_dist, intervals_dist))
+        pattern = get_traffic_pattern(bg_conf.rate_distribution, bg_conf.time_distribution)
+        generator = get_traffic_generator(bg_conf.generator, bg_log_path, pattern=pattern)
         background_traffic = BGTrafficRunner(topo_handler.topo, generator, bg_log_path)
 
     experiment_runner = ExperimentRunner(log_path)
@@ -65,9 +64,7 @@ def main(cfg: MainConfig):
         topo_handler=topo_handler, switch=OVSSwitch, link=TCLink, controller=controller,
         bg_runner=background_traffic, experiment_runner=experiment_runner
     )
-    net.start()
-    CLI(net)
-    net.stop()
+    net.interact()
     print("Experiment finished successfully.")
 
 

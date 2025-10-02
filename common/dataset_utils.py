@@ -33,8 +33,8 @@ def prepare_datasets(cfg: DatasetConfig):
         else:
             info(f"Dataset '{cfg.name}' already exists at '{data_path}'.")
         return
-    partitioner_cls = getattr(partitioner, cfg.partitioner_cls_name)
-    partitioner_instance = partitioner_cls(**cfg.partitioner_kwargs)
+    partitioner_cls = getattr(partitioner, cfg.partitioner.id)
+    partitioner_instance = partitioner_cls(**cfg.partitioner.kwargs)
 
     splits = get_dataset_split_names(cfg.name)
     if cfg.server_eval and "test" not in splits:

@@ -5,16 +5,28 @@ from omegaconf import OmegaConf
 
 
 @dataclass
+class IDKwargsConfig:
+    id: str
+    kwargs: Dict = field(default_factory=dict)
+
+
+@dataclass
 class DatasetConfig:
     path: str = "static/data"
     name: str = "cifar10"
-    partitioner_cls_name: str = "IidPartitioner"
-    partitioner_kwargs: dict = field(default_factory=dict)
+    partitioner: IDKwargsConfig = field(default_factory=lambda: IDKwargsConfig(id="IidPartitioner"))
     force_create: bool = False
     test_size: float = 0.2
     server_eval: bool = True
     train_split_key: str = "train"
     test_split_key: str = "test"
+
+
+@dataclass
+class ZMQConfig:
+    enable: bool = False
+    host: str = "localhost"
+    port: int = 5555
 
 
 @dataclass
@@ -35,7 +47,7 @@ class FLServerConfig:
     accuracy_level: float = 0.8
     collect_metrics: bool = False
     collect_metrics_interval: int = 60
-    zmq: Dict[str, Any] = field(default_factory=lambda: {"enable": False, "host": "localhost", "port": 5555})
+    zmq: ZMQConfig = field(default_factory=ZMQConfig)
     extra: Dict[str, Any] = field(default_factory=dict)
 
 
@@ -51,8 +63,14 @@ class FLClientConfig:
     collect_metrics: bool = False
     collect_metrics_interval: int = 5
     server_address: str = "tcp://localhost:5555"
-    zmq: Dict[str, Any] = field(default_factory=lambda: {"enable": False, "host": "localhost", "port": 5555})
+    zmq: ZMQConfig = field(default_factory=ZMQConfig)
     extra: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class CustomTopologyConfig:
+    path: str
+    class_name: str
 
 
 @dataclass
@@ -60,7 +78,7 @@ class TopologyConfig:
     """Topology configuration"""
     source: str = "topohub"
     topohub_id: Optional[str] = None
-    custom_topology: Dict = field(default_factory=lambda: {"path": "", "class_name": ""})
+    custom_topology: Optional[CustomTopologyConfig] = None
     link_util_key: str = "deg"  # {deg, uni, org} for topohub, and user-defined for custom topologies
     link_config: Dict = field(default_factory=dict)
     switch_config: Dict = field(default_factory=lambda: {"failMode": "standalone", "stp": True})
@@ -68,15 +86,23 @@ class TopologyConfig:
 
 
 @dataclass
-class ContainernetHostConfig:
+class ClientLimitsConfig:
+    distribution: str = "homogeneous"  # {homogeneous, heterogeneous}
+    cpu: float = 0.7
+    mem: int = 1024
+    cpu_mem_tuple: Optional[tuple] = None  # (cpu, mem) for heterogeneous distribution
+
+
+@dataclass
+class FLHostConfig:
     """FL configuration"""
     clients_number: int = 10
-    server_placement: Dict = field(default_factory=lambda: {"name": "highest_degree"})
-    client_placement: Dict = field(default_factory=lambda: {"name": "lowest_degree"})
     image: str = "fl-app:latest"
     network: str = "10.0.0.0/16"
-    clients_limits: Dict = field(default_factory=lambda: {"distribution": "homogeneous", "cpu": 0.7, "mem": 1024})
-    server_limits: Optional[Dict] = field(default_factory=lambda: {"cpu": 1, "mem": 4096})
+    server_placement: IDKwargsConfig = field(default_factory=lambda: IDKwargsConfig(id="highest_degree"))
+    client_placement: IDKwargsConfig = field(default_factory=lambda: IDKwargsConfig(id="lowest_degree"))
+    clients_limits: ClientLimitsConfig = field(default_factory=ClientLimitsConfig)
+    server_limits: Optional[ClientLimitsConfig] = field(default_factory=ClientLimitsConfig)
     extra: Dict = field(default_factory=dict)
 
 
@@ -86,10 +112,10 @@ class BGConfig:
     enabled: bool = False
     image: str = "bg-traffic:latest"
     network: str = "10.1.0.0/16"
-    clients_limits: Dict = field(default_factory=lambda: {"cpu": 0.5, "mem": 256})
-    rate_distribution: Dict = field(default_factory=lambda: {"name": "poisson", "parallel_streams": 1})
-    time_distribution: Dict = field(default_factory=lambda: {"name": "poisson"})
-    generator: Dict = field(default_factory=lambda: {"name": "iperf"})
+    clients_limits: ClientLimitsConfig = field(default_factory=ClientLimitsConfig)
+    rate_distribution: IDKwargsConfig = field(default_factory=lambda: IDKwargsConfig(id="poisson"))
+    time_distribution: IDKwargsConfig = field(default_factory=lambda: IDKwargsConfig(id="poisson"))
+    generator: IDKwargsConfig = field(default_factory=lambda: IDKwargsConfig(id="iperf"))
     extra: Dict = field(default_factory=dict)
 
 
@@ -106,7 +132,7 @@ class SDNConfig:
 @dataclass
 class NetConfig:
     topology: TopologyConfig = field(default_factory=TopologyConfig)
-    fl: ContainernetHostConfig = field(default_factory=ContainernetHostConfig)
+    fl: FLHostConfig = field(default_factory=FLHostConfig)
     bg: BGConfig = field(default_factory=BGConfig)
     sdn: SDNConfig = field(default_factory=SDNConfig)
 

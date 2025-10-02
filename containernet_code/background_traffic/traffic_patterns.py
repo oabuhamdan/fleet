@@ -1,6 +1,6 @@
-from enum import Enum
-from typing import List, Union, Tuple
 import numpy as np
+
+from common.configs import IDKwargsConfig
 
 
 class BaseDistribution:
@@ -79,7 +79,7 @@ DISTRIBUTIONS = {
 }
 
 
-def get_traffic_pattern(rate_dist: dict, time_dist: dict, **kwargs):
-    rate_dist = DISTRIBUTIONS[rate_dist.get("name")](rate_dist, **kwargs)
-    time_dist = DISTRIBUTIONS[time_dist.get("name")](time_dist, **kwargs)
+def get_traffic_pattern(rate_dist: IDKwargsConfig, time_dist: IDKwargsConfig, **kwargs):
+    rate_dist = DISTRIBUTIONS[rate_dist.id](rate_dist.kwargs, **kwargs)
+    time_dist = DISTRIBUTIONS[time_dist.id](time_dist.kwargs, **kwargs)
     return rate_dist, time_dist

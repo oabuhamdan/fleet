@@ -12,7 +12,7 @@ from mininet.topo import Topo
 
 from common.loggers import info
 from common.static import *
-from common.configs import TopologyConfig, NetConfig
+from common.configs import TopologyConfig, NetConfig, ClientLimitsConfig
 
 
 class TopoProcessor:
@@ -39,8 +39,8 @@ class CustomTopoProcessor(TopoProcessor):
 
     def __init__(self, cfg: TopologyConfig, *args, **kwargs):
         super().__init__(cfg, *args, **kwargs)
-        self.path = cfg.custom_topology.get("path", "")
-        self.class_name = cfg.custom_topology.get("class_name", "")
+        self.path = cfg.custom_topology.path
+        self.class_name = cfg.custom_topology.class_name
         self.topo: Optional[Topo] = None
         self.loaded = False
         if not self.path or not self.class_name:
@@ -186,56 +186,15 @@ PLACEMENT_STRATEGIES = {
 }
 
 
-def random_pairs(config):
-    """Generate infinite random CPU/memory pairs."""
-    while True:
-        cpu = random.uniform(config["cpu_min"], config["cpu_max"])
-        mem = random.randint(config["mem_min"], config["mem_max"])
-        yield cpu, mem
-
-
-def stepped_pairs(config):
-    """Generate infinite stepped CPU/memory pairs."""
-    num_steps = config["num_steps"]
-
-    if num_steps < 2:
-        cpu, mem = config["cpu_min"], config["mem_min"]
-        while True:
-            yield cpu, mem
-    else:
-        cpu_step = (config["cpu_max"] - config["cpu_min"]) / (num_steps - 1)
-        mem_step = (config["mem_max"] - config["mem_min"]) / (num_steps - 1)
-
-        pairs = [
-            (round(config["cpu_min"] + i * cpu_step, 3),
-             int(config["mem_min"] + i * mem_step))
-            for i in range(num_steps)
-        ]
-        yield from itertools.cycle(pairs)
-
-
-def homogeneous_pairs(config):
-    """Generate infinite homogeneous CPU/memory pairs."""
-    cpu = config.get("cpu", 0.5)
-    mem = config.get("mem", 256)
-    while True:
-        yield cpu, mem
-
-
-CLIENT_LIMIT_GENERATORS = {
-    "RANDOM": random_pairs,
-    "STEPPED": stepped_pairs,
-    "HOMOGENEOUS": homogeneous_pairs,
-}
-
-
-def client_limits_generator(cfg, **kwargs) -> Iterator[Dict[str, Any]]:
-    if not cfg:
+def client_limits_generator(limits: ClientLimitsConfig) -> Iterator[Dict[str, Any]]:
+    if not limits:
         yield {}
         return
 
-    name = cfg.get("distribution", "homogeneous").upper()
-    pair_generator = CLIENT_LIMIT_GENERATORS[name](cfg)
+    if limits.distribution == "heterogeneous":
+        pair_generator = itertools.cycle(limits.cpu_mem_tuple)
+    else:
+        pair_generator = itertools.cycle([(limits.cpu, limits.mem)])
 
     for cpu, mem in pair_generator:
         yield {
@@ -289,8 +248,8 @@ class TopologyHandler:
     def _create_fl_server(self, fl_network_hosts) -> str:
         """Create FL server and connect it to the network."""
         switches = self.get_switches()
-        placement_name = self.net_cfg.fl.server_placement.get("name")
-        placement_kwargs = self.net_cfg.fl.server_placement
+        placement_name = self.net_cfg.fl.server_placement.id
+        placement_kwargs = self.net_cfg.fl.server_placement.kwargs
         server_switch = PLACEMENT_STRATEGIES[placement_name](switches, single=True, **placement_kwargs)
 
         server_limits = next(client_limits_generator(self.net_cfg.fl.server_limits))
@@ -312,8 +271,8 @@ class TopologyHandler:
         switches = self.get_switches()
         switches.pop(server_node_id)  # exclude server switch from client placement
 
-        placement_name = self.net_cfg.fl.client_placement.get("name")
-        placement_kwargs = self.net_cfg.fl.client_placement
+        placement_name = self.net_cfg.fl.client_placement.id
+        placement_kwargs = self.net_cfg.fl.client_placement.kwargs
         client_nodes = PLACEMENT_STRATEGIES[placement_name](switches, **placement_kwargs)
 
         limits_generator = client_limits_generator(self.net_cfg.fl.clients_limits)

@@ -132,8 +132,8 @@ def init_client(context: Context):
             batch_size=client_cfg.val_batch_size,
         )
 
-    if client_cfg.zmq["enable"]:
-        init_zmq("default", client_cfg.zmq["host"], client_cfg.zmq["port"])
+    if client_cfg.zmq.enable:
+        init_zmq("default", client_cfg.zmq.host, client_cfg.zmq.port)
         system_props = client_metrics_utils.get_client_properties()
         to_zmq(f"client-props", {"client_id": ctx.simple_id, "system": system_props})
 
@@ -145,7 +145,7 @@ def init_client(context: Context):
             publish_callback=lambda metrics: to_zmq(
                 "client-props",
                 {"client_id": ctx.simple_id, "metrics": metrics}
-            ) if client_cfg.zmq["enable"] else None
+            ) if client_cfg.zmq.enable else None
         )
 
     model = Net()
