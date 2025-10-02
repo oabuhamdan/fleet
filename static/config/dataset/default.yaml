@@ -1,5 +1,7 @@
 name: "cifar10"
 force_create: false
 server_eval: ${fl_server.server_eval}
-partitioner_kwargs:
-  num_partitions: ${net.fl.clients_number}
+partitioner:
+  id: IidPartitioner
+  kwargs:
+    num_partitions: ${net.fl.clients_number}

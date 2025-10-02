@@ -16,7 +16,7 @@ LOGGER_NAME = "tg"
 class TrafficGenerator:
     """Abstract base class for traffic generators."""
 
-    def __init__(self, log_path, cfg_kwargs, **kwargs):
+    def __init__(self, cfg_kwargs, log_path, **kwargs):
         self.cfg_kwargs = cfg_kwargs
         self.log_path = log_path
         configure_logger(LOGGER_NAME, log_to_stream=False, log_file=f"{log_path}/traffic_generator.log", level="INFO")
@@ -52,7 +52,7 @@ class IperfGenerator(TrafficGenerator):
     """Iperf3-based traffic generator."""
 
     def __init__(self, cfg_kwargs, log_path, **kwargs):
-        super().__init__(log_path, cfg_kwargs)
+        super().__init__(cfg_kwargs, log_path, **kwargs)
         self.rate_dist, self.intervals_dist = kwargs["pattern"]
         self.log_path = log_path
         self.port = cfg_kwargs.get("base_port", 5000)
@@ -101,7 +101,7 @@ class TcpreplayGenerator(TrafficGenerator):
     """TCPreplay-based traffic generator."""
 
     def __init__(self, cfg_kwargs, log_path, **kwargs):
-        super().__init__(log_path, cfg_kwargs, **kwargs)
+        super().__init__(cfg_kwargs, log_path, **kwargs)
         self.pcap_dir = self.cfg_kwargs.get("pcap_dir", None)
         self.replay_multiplier = self.cfg_kwargs.get("replay_multiplier", 1.0)
         self.replay_loop = self.cfg_kwargs.get("replay_loop", False)
@@ -172,4 +172,4 @@ def get_traffic_generator(cfg: IDKwargsConfig, log_path, **kwargs) -> TrafficGen
     generator_name = cfg.id
     generator_cls: Type[TrafficGenerator] = TRAFFIC_GENERATORS.get(generator_name, None)
     assert generator_cls, f"Unsupported traffic generator type: {generator_name}"
-    return generator_cls(log_path, cfg.kwargs, **kwargs)
+    return generator_cls(cfg.kwargs, log_path, **kwargs)
