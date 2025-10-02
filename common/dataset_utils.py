@@ -32,7 +32,7 @@ def prepare_datasets(cfg: DatasetConfig):
             shutil.rmtree(data_path)
         else:
             info(f"Dataset '{cfg.name}' already exists at '{data_path}'.")
-        return
+            return
     partitioner_cls = getattr(partitioner, cfg.partitioner.id)
     partitioner_instance = partitioner_cls(**cfg.partitioner.kwargs)
 
