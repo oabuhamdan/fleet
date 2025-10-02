@@ -75,8 +75,7 @@ class IperfGenerator(TrafficGenerator):
         rates_file = f"/tmp/rates_{stream_id}.txt"
         rates_str = ",".join(map(str, rates))
         intervals_str = ",".join(map(str, intervals))
-        src.cmd(f'echo "{rates_str}" > {rates_file}')
-        src.cmd(f'echo "{intervals_str}" >> {rates_file}')
+        src.pexec([f'printf "%s\\n%s\\n" "{rates_str}" "{intervals_str}" > {rates_file}'], shell=True)
 
     def start_streams(self) -> None:
         for stream_info in self.streams.values():
@@ -84,9 +83,9 @@ class IperfGenerator(TrafficGenerator):
             src, dst = stream_info.src, stream_info.dst
             port = stream_info.port
             parallel = stream_info.parallel
-            dst.cmd("./scripts/iperf_runner.py server", sid, port, "&") # Start server
+            dst.cmd("nohup ./scripts/iperf_runner.py server", sid, port, "&") # Start server
             time.sleep(1)
-            src.cmd("./scripts/iperf_runner.py client", sid, dst.IP(), port, parallel, "&") # Start client
+            src.cmd("nohup ./scripts/iperf_runner.py client", sid, dst.IP(), port, parallel, "&") # Start client
             info(f"Iperf flow started: {stream_info.stream_id} from {src.name} to {dst.name} on port {port}")
 
     def stop_streams(self) -> None:
