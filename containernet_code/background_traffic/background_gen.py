@@ -62,7 +62,7 @@ class BGTrafficRunner:
         for bg_client in self.bg_clients.values():
             bg_client.pexec(["pkill", "-f", "network_stats.sh"])
 
-        print("Traffic generation stopped")
+        info("Traffic generation stopped")
 
     def _start_monitoring(self) -> None:
         """Start network monitoring for all BG hosts."""

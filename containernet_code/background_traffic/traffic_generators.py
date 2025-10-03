@@ -7,7 +7,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from mininet.node import Host
 
 from common.configs import IDKwargsConfig
-from common.loggers import error, info, configure_logger
+from common.loggers import configure_logger, info, error
 
 LOGGER_NAME = "tg"
 
@@ -86,15 +86,15 @@ class IperfGenerator(TrafficGenerator):
             dst.cmd("nohup ./scripts/iperf_runner.py server", sid, port, "&") # Start server
             time.sleep(1)
             src.cmd("nohup ./scripts/iperf_runner.py client", sid, dst.IP(), port, parallel, "&") # Start client
-            info(f"Iperf flow started: {stream_info.stream_id} from {src.name} to {dst.name} on port {port}")
+            info(f"Iperf flow started: {stream_info.stream_id} from {src.name} to {dst.name} on port {port}", LOGGER_NAME)
 
     def stop_streams(self) -> None:
         for stream_info in self.streams.values():
-            print(f"Stopping iperf flow: {stream_info.stream_id}")
+            info(f"Stopping iperf flow: {stream_info.stream_id}", LOGGER_NAME)
             sid = stream_info.stream_id
             for host in [stream_info.src, stream_info.dst]:
                 host.pexec(["./scripts/iperf_runner.py", "stop", sid])
-        print("All iperf flows stopped")
+        info("All iperf flows stopped", LOGGER_NAME)
 
 class TcpreplayGenerator(TrafficGenerator):
     """TCPreplay-based traffic generator."""
@@ -114,7 +114,7 @@ class TcpreplayGenerator(TrafficGenerator):
             # Find PCAP files for this flow
             pcap_files = self._find_pcap_files(stream_id)
             if not pcap_files:
-                error(f"No PCAP files found for {stream_id}")
+                error(f"No PCAP files found for {stream_id}", LOGGER_NAME)
                 return False
 
             # Calculate replay speed
@@ -127,11 +127,11 @@ class TcpreplayGenerator(TrafficGenerator):
             src_host.pexec(["./start_tcpreplay.sh", dst_host.IP(), str(multiplier),
                             pcap_list, loop_flag, str(log_file)])
 
-            info(f"TCPreplay flow started: {stream_id} (multiplier: {multiplier:.2f})")
+            info(f"TCPreplay flow started: {stream_id} (multiplier: {multiplier:.2f})", LOGGER_NAME)
             return True
 
         except Exception as e:
-            error(f"Failed to start tcpreplay flow {stream_id}: {e}")
+            error(f"Failed to start tcpreplay flow {stream_id}: {e}", LOGGER_NAME)
             return False
 
     def _find_pcap_files(self, flow_id: str) -> List[str]:
@@ -158,7 +158,7 @@ class TcpreplayGenerator(TrafficGenerator):
         """Stop all tcpreplay flows."""
         for host in self.streams:
             host.pexec(["pkill", "-f", "tcpreplay"])
-        info("All tcpreplay flows stopped")
+        info("All tcpreplay flows stopped", LOGGER_NAME)
 
 
 TRAFFIC_GENERATORS = {

@@ -38,7 +38,7 @@ cs.store(name="base_main", node=MainConfig)
 def main(cfg: MainConfig):
     OmegaConf.save(cfg, LOCAL_RESOLVED_CONFIG_PATH)  # save resolved config for FL and BG containers
     log_path = Path(cfg.log_dir)
-    configure_logger("default", log_to_stream=True, log_file=f"{log_path}/net.log", level="INFO")
+    configure_logger("default", log_to_stream=True, log_file=f"{log_path}/{cfg.exp_name}.log", level="INFO")
 
     prepare_datasets(cfg.dataset)
     controller = None
@@ -65,7 +65,7 @@ def main(cfg: MainConfig):
         bg_runner=background_traffic, experiment_runner=experiment_runner
     )
     net.interact()
-    print("Experiment finished successfully.")
+    info("Experiment finished successfully.")
 
 
 if __name__ == "__main__":

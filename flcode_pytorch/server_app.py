@@ -32,7 +32,7 @@ def server_fn(context: Context) -> ServerAppComponents:
     )
 
     strategy = get_strategy(ctx, model=Net())
-    print(f"Using strategy: {strategy}")
+    info(f"Using strategy: {strategy}")
     client_manager = MyClientManager(ctx)
     config = flwr.server.ServerConfig(num_rounds=server_cfg.num_rounds)
     server = MyServer(ctx, client_manager=client_manager, strategy=strategy)

@@ -1,7 +1,7 @@
 from mininet.net import Containernet
 from mininet.node import Host
 
-from common.loggers import error
+from common.loggers import error, info
 from containernet_code.background_traffic.background_gen import BGTrafficRunner
 from containernet_code.experiment_runner import ExperimentRunner
 from containernet_code.my_topology import TopologyHandler
@@ -28,14 +28,14 @@ class MyContainernet(Containernet):
         try:
             """Start the experiment with background traffic and monitoring."""
             if ping:
-                print("Pinging FL hosts to ensure connectivity...")
+                info("Pinging FL hosts to ensure connectivity...")
                 self.ping_fl_hosts()
 
             if self.bg_runner and auto_bg:
-                print("Starting background traffic generation...")
+                info("Starting background traffic generation...")
                 self.bg_runner.start()
 
-            print("Starting Experiment")
+            info("Starting Experiment")
             self.experiment_runner.start_experiment()
 
             if logs:
@@ -49,11 +49,11 @@ class MyContainernet(Containernet):
 
     def stop_experiment(self):
         """Stop the experiment and background traffic."""
-        print("Stopping Experiment")
+        info("Stopping Experiment")
         self.experiment_runner.stop_experiment()
         if self.bg_runner:
             self.bg_runner.stop()
-        print("Experiment stopped successfully.")
+        info("Experiment stopped successfully.")
 
     def stop(self):
         self.stop_experiment()
@@ -69,12 +69,12 @@ class MyContainernet(Containernet):
 
     def start_background_traffic(self):
         """Start background traffic generation."""
-        print("Starting background traffic generation...")
+        info("Starting background traffic generation...")
         self.bg_runner.start()
 
     def stop_background_traffic(self):
         """Stop background traffic generation."""
-        print("Stopping background traffic generation...")
+        info("Stopping background traffic generation...")
         self.bg_runner.stop()
 
     def pause_experiment(self):
@@ -82,4 +82,4 @@ class MyContainernet(Containernet):
         print("Pausing Experiment")
         self.experiment_runner.pause_experiment()
         self.bg_runner.stop()
-        print("Experiment paused successfully.")
+        info("Experiment paused successfully.")

@@ -10,7 +10,7 @@ from docker.types import DeviceRequest
 from mininet.node import Docker
 from mininet.topo import Topo
 
-from common.loggers import info
+from common.loggers import info, warning
 from common.static import *
 from common.configs import TopologyConfig, NetConfig, ClientLimitsConfig
 
@@ -82,7 +82,7 @@ class CustomTopoProcessor(TopoProcessor):
             src, dst = link
             link_info = self.topo.linkInfo(src, dst)
             if self.cfg.link_util_key not in link_info:
-                print(self.NO_BG_WARNING.format(src=src, dst=dst))
+                warning(self.NO_BG_WARNING.format(src=src, dst=dst))
 
             link_util = link_info.pop(self.cfg.link_util_key, 0.0)
             link_info['util'] = dict(fwd=link_util, bwd=link_util)
@@ -136,7 +136,7 @@ class TopohubTopoProcessor(TopoProcessor):
             link_info = self.topo.linkInfo(src, dst)
             link_info.update(link_configs)
             if self.cfg.link_util_key not in link_info["ecmp_fwd"]:
-                print(self.NO_BG_WARNING.format(src=src, dst=dst))
+                warning(self.NO_BG_WARNING.format(src=src, dst=dst))
 
             link_info['util'] = dict(
                 fwd=link_info.pop("ecmp_fwd").get(self.cfg.link_util_key, 0.0),
