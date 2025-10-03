@@ -65,7 +65,7 @@ def main(cfg: MainConfig):
         bg_runner=background_traffic, experiment_runner=experiment_runner
     )
     net.interact()
-    info("Experiment finished successfully.")
+    info("FLEET terminated successfully.")
 
 
 if __name__ == "__main__":

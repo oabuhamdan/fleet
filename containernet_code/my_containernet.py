@@ -49,11 +49,10 @@ class MyContainernet(Containernet):
 
     def stop_experiment(self):
         """Stop the experiment and background traffic."""
-        info("Stopping Experiment")
+        info("Terminating FLEET")
         self.experiment_runner.stop_experiment()
         if self.bg_runner:
             self.bg_runner.stop()
-        info("Experiment stopped successfully.")
 
     def stop(self):
         self.stop_experiment()

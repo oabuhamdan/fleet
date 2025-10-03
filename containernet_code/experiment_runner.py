@@ -119,7 +119,9 @@ class ExperimentRunner:
         server_bridge_ip = self.fl_server.dcinfo['NetworkSettings']['Networks']['bridge']['IPAddress']
         cmd = [".venv/bin/flwr", "run", "--federation-config", f"address='{server_bridge_ip}:9093'"]
         result = subprocess.run(cmd, capture_output=True, text=True)
-        info(f"{result.stdout}") if result.returncode == 0 else info(f"{result.stderr}")
+        if result.returncode != 0:
+            error(f"{result.stderr}")
+            raise RuntimeError("Failed to start flwr app")
 
     def _start_service(self, host, cmd, name):
         full_cmd = f"nohup {cmd} > /tmp/{name}.log 2>&1 & "

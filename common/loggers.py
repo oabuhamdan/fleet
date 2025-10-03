@@ -18,6 +18,30 @@ _zmq_publishers: Dict[str, zmq.Socket] = {}  # name -> socket
 _zmq_ip_port_map: Dict[Tuple[str, int], str] = {}  # (ip, port) -> name
 _zmq_context: Optional[zmq.Context] = None
 
+LOG_HEADER_TEMPLATE = "[{name}] {levelname} {asctime}:\t"
+
+class ColoredFormatter(logging.Formatter):
+    LOG_COLORS = {
+        "DEBUG": "\033[36m",  # Cyan
+        "INFO": "\033[92m",  # Green
+        "WARNING": "\033[93m",  # Yellow
+        "ERROR": "\033[91m",  # Red
+        "CRITICAL": "\033[1;91m"  # Bright Red
+    }
+    RESET_COLOR = "\033[0m"
+
+    def format(self, record):
+        # Fill header template
+        header = LOG_HEADER_TEMPLATE.format(
+            name=record.name,
+            levelname=record.levelname,
+            asctime=self.formatTime(record, self.datefmt)
+        )
+        # Color only the header
+        color = self.LOG_COLORS.get(record.levelname, "")
+        message = record.getMessage()
+        return f"{color}{header}{self.RESET_COLOR} {message}"
+
 
 def configure_logger(name: str, log_to_stream: bool = True, log_file: Optional[str | Path] = None,
                      level: str = "INFO") -> logging.Logger:
@@ -31,21 +55,32 @@ def configure_logger(name: str, log_to_stream: bool = True, log_file: Optional[s
         logger.propagate = False
         logger.handlers.clear()
 
-        formatter = logging.Formatter(
-            f"\033[95m[{name}] %(levelname)s %(asctime)s\t: %(message)s\033[0m",
-            datefmt='%Y-%m-%d %H:%M:%S'
+        # Shared header format using style='{'
+        base_format = LOG_HEADER_TEMPLATE + " {message}"
+
+        # Formatter for file output (no colors)
+        plain_formatter = logging.Formatter(
+            base_format,
+            datefmt='%Y-%m-%d %H:%M:%S',
+            style='{'
+        )
+
+        # Formatter for stream output (with colored header only)
+        color_formatter = ColoredFormatter(
+            datefmt='%Y-%m-%d %H:%M:%S',
+            style='{'
         )
 
         # Console handler
         if log_to_stream:
-            console_handler = logging.StreamHandler()
-            console_handler.setFormatter(formatter)
-            logger.addHandler(console_handler)
+            stream_handler = logging.StreamHandler()
+            stream_handler.setFormatter(color_formatter)
+            logger.addHandler(stream_handler)
 
         # File handler
         if log_file:
             file_handler = logging.FileHandler(log_file)
-            file_handler.setFormatter(formatter)
+            file_handler.setFormatter(plain_formatter)
             logger.addHandler(file_handler)
 
         _loggers[name] = logger
