@@ -7,7 +7,7 @@ import torch
 from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context, Config, Scalar
 
-from common.dataset_utils import get_dataloader, get_train_dataset, get_test_dataset, basic_img_transform
+from common.dataset_utils import get_dataloader, basic_img_transform, get_client_partition
 from common.loggers import init_zmq, configure_logger, info, debug, warning, to_zmq
 from common.static import CONTAINER_LOG_PATH, CONTAINER_DATA_PATH, CONTAINER_RESOLVED_CONFIG_PATH
 from .utils import client_metrics_utils
@@ -43,8 +43,8 @@ class FlowerClient(NumPyClient):
             optim,
             loss_fn,
             epochs=local_epochs,
-            input_key="img",
-            target_key="label",
+            input_features=self.ctx.dataset_cfg.input_features,
+            target_features=self.ctx.dataset_cfg.target_features,
         )
 
         metrics = OrderedDict(
@@ -70,8 +70,8 @@ class FlowerClient(NumPyClient):
             self.net,
             self.eval_dataloader,
             self.ctx.device,
-            input_key="img",
-            target_key="label",
+            input_features=self.ctx.dataset_cfg.input_features,
+            target_features=self.ctx.dataset_cfg.target_features,
         )
         metrics = OrderedDict(
             client=self.ctx.simple_id,
@@ -115,22 +115,22 @@ def init_client(context: Context):
         device=device
     )
 
-    train_dataset = get_train_dataset(CONTAINER_DATA_PATH, dataset_cfg.name, simple_id, key=dataset_cfg.train_split_key)
+    data_partition = get_client_partition(CONTAINER_DATA_PATH, dataset_cfg.name, simple_id)
     train_loader = get_dataloader(
-        train_dataset,
-        transform=basic_img_transform(),
+        data_partition["train"],
+        transform=basic_img_transform(dataset_cfg.input_features[0]),
         batch_size=client_cfg.train_batch_size,
         shuffle=True,
     )
-
-    eval_dataset = get_test_dataset(CONTAINER_DATA_PATH, dataset_cfg.name, simple_id, key=dataset_cfg.test_split_key)
+    info(f"Training dataset size: {len(train_loader.dataset)}")
     eval_loader = None
-    if eval_dataset:
+    if "test" in data_partition:
         eval_loader = get_dataloader(
-            eval_dataset,
-            transform=basic_img_transform(),
+            data_partition["test"],
+            transform=basic_img_transform(dataset_cfg.input_features[0]),
             batch_size=client_cfg.val_batch_size,
         )
+        info(f"Validation dataset size: {len(eval_loader.dataset)}")
 
     if client_cfg.zmq.enable:
         init_zmq("default", client_cfg.zmq.host, client_cfg.zmq.port)

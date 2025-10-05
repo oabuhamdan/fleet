@@ -9,7 +9,7 @@ from torch import nn
 from common.loggers import warning
 from common.static import CONTAINER_DATA_PATH
 from flcode_pytorch.utils.contexts import ServerContext
-from common.dataset_utils import get_dataloader, get_test_dataset, basic_img_transform
+from common.dataset_utils import get_dataloader, get_server_eval_dataset, basic_img_transform
 from flcode_pytorch.utils.model_utils import get_weights, set_weights, test
 
 
@@ -38,20 +38,22 @@ def get_aggregation_fn(metrics_agg_map: dict[str, str]) -> callable:
 
 
 def get_evaluate_fn(ctx, model):
-    server_eval_dataset = get_test_dataset(CONTAINER_DATA_PATH, ctx.dataset_cfg.name, "server_eval")
+    server_eval_dataset = get_server_eval_dataset(CONTAINER_DATA_PATH, ctx.dataset_cfg.name)
     if not server_eval_dataset:
         warning("Server evaluation dataset not found. Skipping server evaluation.")
         return None
 
     server_eval_dataloader = get_dataloader(
         server_eval_dataset,
-        transform=basic_img_transform(),
+        transform=basic_img_transform(ctx.dataset_cfg.input_features[0]),
         batch_size=ctx.server_cfg.val_batch_size
     )
 
     def evaluate(server_round, parameters, configs):
         set_weights(model, parameters)
-        loss, accuracy = test(model, server_eval_dataloader, ctx.device, input_key="img", target_key="label")
+        loss, accuracy = test(model, server_eval_dataloader, ctx.device,
+                              input_features=ctx.dataset_cfg.input_features,
+                              target_features=ctx.dataset_cfg.target_features)
         return loss, {"loss": loss, "accuracy": accuracy}
 
     return evaluate
@@ -71,7 +73,7 @@ def get_strategy(ctx: ServerContext, model: nn.Module) -> Strategy:
     strategy_kwargs = ctx.server_cfg.extra.get("strategy_kwargs", {})
     return strategy_class(
         fraction_fit=ctx.server_cfg.fraction_fit,
-        fraction_evaluate=ctx.server_cfg.fraction_evaluate,
+        fraction_evaluate=0 if ctx.server_cfg.server_eval else ctx.server_cfg.fraction_evaluate,
         min_fit_clients=ctx.server_cfg.min_fit_clients,
         min_evaluate_clients=ctx.server_cfg.min_evaluate_clients,
         min_available_clients=ctx.server_cfg.min_available_clients,

@@ -26,27 +26,15 @@ class Net(nn.Module):
         return self.fc3(x)
 
 
-def get_weights(model: nn.Module, ):
-    """Return the model weights as a list of NumPy arrays."""
-    return [val.cpu().numpy() for _, val in model.state_dict().items()]
-
-
-def set_weights(model: nn.Module, parameters):
-    """Set the model weights from a list of NumPy arrays."""
-    params_dict = zip(model.state_dict().keys(), parameters)
-    state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
-    model.load_state_dict(state_dict, strict=True)
-
-
 def train(
         model: nn.Module,
         trainloader,
         device,
         optimizer,
         loss_fn,
+        input_features: list[str],
+        target_features: list[str],
         epochs: int = 1,
-        input_key: str = "inputs",
-        target_key: str = "targets",
         scheduler=None,
         log_interval: int = 100,
         **kwargs
@@ -57,8 +45,8 @@ def train(
     running_loss = 0.0
     for epoch in range(epochs):
         for i, batch in enumerate(trainloader):
-            inputs = batch[input_key].to(device)
-            targets = batch[target_key].to(device)
+            inputs = batch[input_features[0]].to(device)
+            targets = batch[target_features[0]].to(device)
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = loss_fn(outputs, targets)
@@ -77,9 +65,9 @@ def test(
         model: nn.Module,
         testloader,
         device,
+        input_features: list[str],
+        target_features: list[str],
         loss_class=nn.CrossEntropyLoss,
-        input_key: str = "inputs",
-        target_key: str = "targets"
 ):
     """Evaluate the model and return average eval_loss and eval_accuracy."""
     model.to(device)
@@ -88,8 +76,8 @@ def test(
     correct, loss_total, total = 0, 0, 0
     with torch.no_grad():
         for batch in testloader:
-            inputs = batch[input_key].to(device)
-            targets = batch[target_key].to(device)
+            inputs = batch[input_features[0]].to(device)
+            targets = batch[target_features[0]].to(device)
             outputs = model(inputs)
             loss_total += loss_fn(outputs, targets).item()
             _, predicted = torch.max(outputs.data, 1)
@@ -98,3 +86,15 @@ def test(
     eval_accuracy = correct / total if total > 0 else 0
     eval_loss = loss_total / len(testloader) if len(testloader) > 0 else 0
     return eval_loss, eval_accuracy
+
+
+def get_weights(model: nn.Module, ):
+    """Return the model weights as a list of NumPy arrays."""
+    return [val.cpu().numpy() for _, val in model.state_dict().items()]
+
+
+def set_weights(model: nn.Module, parameters):
+    """Set the model weights from a list of NumPy arrays."""
+    params_dict = zip(model.state_dict().keys(), parameters)
+    state_dict = OrderedDict({k: torch.tensor(v) for k, v in params_dict})
+    model.load_state_dict(state_dict, strict=True)

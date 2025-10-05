@@ -14,7 +14,6 @@ from common.loggers import warning, info
 
 WARNING_RECREATE_MESSAGE = (
     f"You can recreate the dataset by setting the force_create to true.\n"
-    f"Returning None."
 )
 
 
@@ -26,75 +25,72 @@ def _process_dataset_name(name):
 def prepare_datasets(cfg: DatasetConfig):
     clean_name = _process_dataset_name(cfg.name)
     data_path = f"{cfg.path}/{clean_name}"
+
     if Path(data_path).exists():
         if cfg.force_create:
-            info("Removing existing dataset at '{data_path}' as 'force_create' is True.")
+            info(f"Removing existing dataset at '{data_path}' as 'force_create' is True.")
             shutil.rmtree(data_path)
         else:
             info(f"Dataset '{cfg.name}' already exists at '{data_path}'.")
             return
+
     partitioner_cls = getattr(partitioner, cfg.partitioner.id)
-    partitioner_instance = partitioner_cls(**cfg.partitioner.kwargs)
+    train_partitioner = partitioner_cls(**cfg.partitioner.kwargs)
+    has_test = "test" in get_dataset_split_names(cfg.name)
 
-    splits = get_dataset_split_names(cfg.name)
-    if cfg.server_eval and "test" not in splits:
-        warning("Dataset does not have a 'test' split. Server evaluation will be skipped.")
-        cfg.server_eval = False
+    # Handle server_eval when test split doesn't exist
+    if cfg.server_eval and not has_test:
+        warning(f"server_eval=True but dataset '{cfg.name}' has no test split. Server evaluation will be skipped.")
 
-    partitioners = {"train": partitioner_instance}
-    if cfg.server_eval:
-        partitioners["test"] = 1
+    # Configure partitioners
+    partitioners = {"train": train_partitioner}
+    if has_test:
+        partitioners["test"] = 1 if cfg.server_eval else partitioner_cls(**cfg.partitioner.kwargs)
 
     fds = FederatedDataset(dataset=cfg.name, partitioners=partitioners)
-    if cfg.server_eval:
-        testset = fds.load_split("test")
-        testset.save_to_disk(f"{data_path}/server_eval")
-        for partition_id in range(partitioner_instance.num_partitions):
-            partition = fds.load_partition(partition_id, "train")
-            partition.save_to_disk(f"{data_path}/{partition_id + 1}")
-    else:
-        for partition_id in range(partitioner_instance.num_partitions):
-            partition = fds.load_partition(partition_id)
-            partition = partition.train_test_split(test_size=cfg.test_size)
-            partition.save_to_disk(f"{data_path}/{partition_id + 1}")
+    if cfg.server_eval and has_test:
+        info("Saving centralized test split for server evaluation.")
+        fds.partitioners["test"].dataset.save_to_disk(f"{data_path}/server_eval")
+
+    for partition_id in range(fds.partitioners["train"].num_partitions):
+        train_ds = fds.partitioners["train"].load_partition(partition_id)
+        if cfg.server_eval:
+            dset = DatasetDict({"train": train_ds})
+        else:
+            if has_test:
+                test_ds = fds.partitioners["test"].load_partition(partition_id)
+                dset = DatasetDict({"train": train_ds, "test": test_ds})
+            else:
+                dset = train_ds.train_test_split(test_size=cfg.test_size)
+
+        dset.save_to_disk(f"{data_path}/{partition_id + 1}")
 
 
 def get_partition(path, name, partition_id) -> Optional[Union[Dataset, DatasetDict]]:
     name = _process_dataset_name(name)
-    data_path = f"{path}/{name}"
+    data_path = f"{path}/{name}/{partition_id}"
 
-    partition: Union[Dataset, DatasetDict] = datasets.load_from_disk(f"{data_path}/{partition_id}")
-    if partition is None:
-        warning(f"Dataset '{name}' not found at '{data_path}'.\n{WARNING_RECREATE_MESSAGE}")
+    if not Path(data_path).exists():
+        warning(f"Dataset '{name}' not found at '{path}' or partition {partition_id} doesn't exist")
+        warning(WARNING_RECREATE_MESSAGE)
         return None
+    partition: Union[Dataset, DatasetDict] = datasets.load_from_disk(data_path)
     return partition
 
 
-def get_train_dataset(path, name, partition_id, key) -> Dataset:
-    dataset = get_partition(path, name, partition_id)
-    assert dataset, f"Dataset '{name}' not found at '{path}'.\n{WARNING_RECREATE_MESSAGE}"
+def get_client_partition(path, name, partition_id) -> DatasetDict:
+    dataset_dict = get_partition(path, name, partition_id)
+    assert dataset_dict, f"Dataset '{name}' not found at '{path}'.\n{WARNING_RECREATE_MESSAGE}"
+    assert isinstance(dataset_dict, DatasetDict), f"Dataset '{name}' is not a DatasetDict."
+    return dataset_dict
 
-    if isinstance(dataset, DatasetDict):
-        assert key in dataset, f"Key '{key}' not found in dataset '{name}'."
-        dataset = dataset[key]
-
-    info("Returning the whole dataset as it does not have splits.")
-    return dataset
-
-
-def get_test_dataset(path, name, partition_id, key=None) -> Optional[Dataset]:
-    dataset = get_partition(path, name, partition_id)
+def get_server_eval_dataset(path, name) -> Optional[Dataset]:
+    dataset = get_partition(path, name, "server_eval")
     if not dataset:
         return None
 
-    if partition_id == "server_eval":
-        return dataset
-
-    if isinstance(dataset, DatasetDict) and key in dataset:
-        return dataset[key]
-
-    return None
-
+    assert isinstance(dataset, Dataset), f"Server eval dataset '{name}' is not a Dataset."
+    return dataset
 
 def get_dataloader(dataset: Dataset, transform, batch_size: int, **dataloader_kwargs) -> DataLoader:
     dataset = dataset.with_transform(transform)
@@ -102,14 +98,14 @@ def get_dataloader(dataset: Dataset, transform, batch_size: int, **dataloader_kw
     return dataloader
 
 
-def basic_img_transform():
+def basic_img_transform(img_key):
     img_transform = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        transforms.Normalize(0.5, 0.5)
     ])
 
     def apply(batch):
-        batch["img"] = [img_transform(row) for row in batch["img"]]
+        batch[img_key] = [img_transform(row) for row in batch[img_key]]
         return batch
 
     return apply
