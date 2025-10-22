@@ -8,6 +8,13 @@ fl:
   clients_number: 3
   image: "fleet-fl:latest"
   network: "10.0.0.0/16"
+  clients_limits:
+    cpu: 3.0
+    mem: 2048
+    distribution: homogeneous
+  server_limits:
+    cpu: 3.0
+    mem: 4096
   extra: { }
 
 bg:
