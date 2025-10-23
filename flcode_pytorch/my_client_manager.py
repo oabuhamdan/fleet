@@ -1,5 +1,9 @@
-from dataclasses import dataclass
-from typing import Optional, Any, ClassVar
+import random
+from collections import deque
+from copy import deepcopy
+from dataclasses import dataclass, field
+from threading import Thread
+from typing import Optional
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from flwr.common import GetPropertiesIns
@@ -13,20 +17,10 @@ from flcode_pytorch.utils.contexts import ServerContext
 
 @dataclass
 class ClientProps:
-    cid: str = ""
-    system: dict = None
-    metrics: dict = None
-    dataset: dict = None
-
-    PROPS_MAP: ClassVar[dict[str, str]] = {
-        "system": "system",
-        "metrics": "metrics",
-        "dataset": "dataset"
-    }
-
-    def update_property(self, props_type: str, value: Any) -> None:
-        if props_type in self.PROPS_MAP:
-            setattr(self, self.PROPS_MAP[props_type], value)
+    cid: str
+    system: dict = field(default_factory=dict)
+    dataset: dict = field(default_factory=dict)
+    metrics: deque = field(default_factory=lambda: deque(maxlen=10))
 
 
 class MyClientManager(SimpleClientManager):
@@ -43,7 +37,8 @@ class MyClientManager(SimpleClientManager):
     def register(self, client: ClientProxy) -> bool:
         debug(f"Registering client {client.cid}")
         success = super().register(client)
-        self.setup_client_info(client)
+        # Use threading to avoid blocking
+        Thread(target=self.setup_client_info, args=(client,), daemon=True).start()
         return success
 
     def unregister(self, client: ClientProxy) -> None:
@@ -55,21 +50,31 @@ class MyClientManager(SimpleClientManager):
             if self.scheduler:
                 self.scheduler.remove_job(f"metrics-{client.cid}")
 
-    def local_get_client_info(self, client: ClientProxy) -> ClientProps:  # Changed return type
+    def local_get_client_info(self, client: ClientProxy) -> Optional[ClientProps]:  # Changed return type
         """Get information about a specific client."""
-        return self.clients_info.get(client.cid, None)
+        props = self.clients_info.get(client.cid, None)
+        return deepcopy(props) if props else None
+
+    def _append_new_metrics(self, client: ClientProxy):
+        client_props = self.clients_info[client.cid]
+        new_metrics = self.remote_client_props(client, "metrics")
+        client_props.metrics.append(new_metrics)
 
     def setup_client_info(self, client: ClientProxy):
         # Initialize the ClientProps for this client if it doesn't exist
         if client.cid not in self.clients_info:
             self.clients_info[client.cid] = ClientProps(cid=client.cid)
-            self.remote_client_props(client, "system")
+            self.clients_info[client.cid].system = self.remote_client_props(client, "system")
             if self.ctx.server_cfg.collect_metrics:
                 interval = self.ctx.server_cfg.collect_metrics_interval
-                self.scheduler.add_job(lambda c=client: self.remote_client_props(c, "metrics"), "interval",
-                                       seconds=interval, id=f"metrics-{client.cid}", replace_existing=True)
+                self.scheduler.add_job(
+                    self._append_new_metrics, args=(client,),
+                    trigger="interval", seconds=interval + random.randint(-5, 5),
+                    id=f"metrics-{client.cid}", replace_existing=True
+                )
 
-    def remote_client_props(self, client, props_type):
+    @staticmethod
+    def remote_client_props(client, props_type):
         properties = client.get_properties(GetPropertiesIns({"props_type": props_type}), None, None).properties
         props_dict = dict(properties)
-        self.clients_info[client.cid].update_property(props_type, props_dict)
+        return props_dict
