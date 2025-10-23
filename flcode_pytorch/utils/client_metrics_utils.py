@@ -1,7 +1,5 @@
 import logging
-import platform
 import socket
-import sys
 import time
 from collections import deque
 from typing import Dict, Any, List
@@ -9,6 +7,11 @@ from typing import Dict, Any, List
 import psutil
 import torch
 from apscheduler.schedulers.background import BackgroundScheduler
+
+
+def _read(path):
+    with open(path) as f:
+        return f.read().strip()
 
 
 class MetricsCollector:
@@ -56,9 +59,29 @@ class MetricsCollector:
         if self.publish_callback:
             self.publish_callback(self.get_metrics(aggregation="last"))
 
+    # Memory usage %
+    def mem_percent(self):
+        used = int(_read("/sys/fs/cgroup/memory.current"))
+        limit = _read("/sys/fs/cgroup/memory.max")
+        if limit == "max": return 0
+        return round(100 * used / int(limit), 2)
+
+    # CPU usage % over 1 second
+    def cpu_percent(self):
+        def usage():
+            for line in _read("/sys/fs/cgroup/cpu.stat").splitlines():
+                if line.startswith("usage_usec"):
+                    return int(line.split()[1])
+            return 0
+
+        start = usage()
+        time.sleep(self.interval)
+        end = usage()
+        return round((end - start) / (self.interval * 1_000_000) * 100, 2)
+
     def _collect_system_metrics(self):
-        self.cpu_usage.append(psutil.cpu_percent())
-        self.ram_usage.append(psutil.virtual_memory().percent)
+        self.cpu_usage.append(self.cpu_percent())
+        self.ram_usage.append(self.mem_percent())
 
     def _collect_gpu_metrics(self):
         try:
@@ -98,21 +121,20 @@ class MetricsCollector:
         return metrics
 
 
-def get_os_info() -> Dict[str, Any]:
-    """Get basic system information."""
-    return {
-        "os_type": platform.system(),
-        "os_release": platform.release(),
-        "python_version": sys.version.split()[0],
-    }
+def get_cpu_limit():
+    quota, period = _read("/sys/fs/cgroup/cpu.max").split()
+    return None if quota == "max" else round(int(quota) / int(period), 2)
+
+
+def get_total_ram_mb():
+    val = _read("/sys/fs/cgroup/memory.max")
+    return int(val) / (1024 ** 2) if val != "max" else 0
 
 
 def get_hardware_info() -> Dict[str, Any]:
-    """Get hardware information including CPU, RAM, and GPU details."""
     info = {
-        "cpu_cores": psutil.cpu_count(logical=False),
-        "cpu_threads": psutil.cpu_count(logical=True),
-        "total_ram": psutil.virtual_memory().total / (1024 ** 2),  # MB
+        "cpu_limit": get_cpu_limit(),
+        "total_ram": get_total_ram_mb()
     }
 
     if torch.cuda.is_available():
@@ -143,7 +165,7 @@ def get_dataset_info(trainloader: Any, valloader: Any) -> Dict[str, Any]:
     """Get information about the dataset and data loaders."""
     return {
         "train_samples": len(trainloader.dataset),
-        "val_samples": len(valloader.dataset),
+        "val_samples": len(valloader.dataset) if valloader else 0,
         "batch_size": trainloader.batch_size,
     }
 
@@ -156,14 +178,11 @@ def get_training_params(local_epochs: int, learning_rate: float) -> Dict[str, An
     }
 
 
-def get_client_properties(os=True,
-                          hardware=True,
+def get_client_properties(hardware=True,
                           network=True,
-                          interface_name="flc") -> Dict[str, Dict[str, Any]]:
+                          interface_name="flc") -> Dict[str, Any]:
     """Get all client properties combined."""
     properties = {}
-    if os:
-        properties.update(get_os_info())
     if hardware:
         properties.update(get_hardware_info())
     if network:
