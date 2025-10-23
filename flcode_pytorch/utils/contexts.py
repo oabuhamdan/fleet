@@ -14,6 +14,7 @@ class ServerContext(NamedTuple):
 
 
 class ClientContext(NamedTuple):
+    cid: int
     simple_id: int
     flwr_ctx: Context
     client_cfg: FLClientConfig
