@@ -64,7 +64,6 @@ class FLClientConfig:
     log_interval: int = 100
     collect_metrics: bool = False
     collect_metrics_interval: int = 5
-    server_address: str = "tcp://localhost:5555"
     zmq: ZMQConfig = field(default_factory=ZMQConfig)
     extra: Dict[str, Any] = field(default_factory=dict)
 
