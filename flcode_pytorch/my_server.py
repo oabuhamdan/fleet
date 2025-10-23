@@ -126,7 +126,7 @@ class MyServer(flwr.server.Server):
                 loss_cen, metrics_cen = res_cen
                 log(
                     INFO,
-                    "Fit Progress: R %s:  M: %s | RT: %.2f sec | CT: %.2f sec",
+                    "Fit Progress: R %s | M: %s | RT: %.2f sec | CT: %.2f sec",
                     current_round,
                     metrics_cen,
                     time.perf_counter() - round_start_time,
@@ -162,6 +162,13 @@ class MyServer(flwr.server.Server):
         end_time = time.perf_counter()
         elapsed = end_time - fit_start_time
         return history, elapsed
+
+    def disconnect_all_clients(self, timeout: Optional[float]) -> None:
+        super().disconnect_all_clients(timeout)
+        all_clients = self._client_manager.all()
+        clients = [all_clients[k] for k in all_clients.keys()]
+        for client in clients:
+            self._client_manager.unregister(client)
 
     @staticmethod
     def reached_accuracy(aggregate_round_metrics, accuracy_level):
