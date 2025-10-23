@@ -43,15 +43,16 @@ class FlowerClient(NumPyClient):
             input_features=self.ctx.dataset_cfg.input_features,
             target_features=self.ctx.dataset_cfg.target_features,
         )
-
+        tok = time.perf_counter()
         metrics = OrderedDict(
             client=self.ctx.simple_id,
             computing_start_time=tik,
-            computing_finish_time=time.perf_counter(),
+            computing_finish_time=tok,
             loss=loss
         )
         debug(f"Training Metrics: {metrics}")
         info(f"Finished Training - Round {config['server-round']}")
+        info(f"Time taken for training: {tok - tik} seconds in Round {config['server-round']}")
         return get_weights(self.net), len(self.train_dataloader.dataset), metrics
 
     def evaluate(self, parameters, config):
