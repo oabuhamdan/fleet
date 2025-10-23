@@ -18,9 +18,9 @@ from .utils.model_utils import Net, get_weights, set_weights, test, train
 
 
 class FlowerClient(NumPyClient):
-    def __init__(self, ctx: ClientContext, net, train_dataloader, eval_dataloader, metrics_collector):
+    def __init__(self, ctx: ClientContext, train_dataloader, eval_dataloader, metrics_collector):
         self.ctx = ctx
-        self.net = net
+        self.net = Net()
         self.train_dataloader = train_dataloader
         self.eval_dataloader = eval_dataloader
         self.metrics_collector: MetricsCollector = metrics_collector
@@ -32,17 +32,14 @@ class FlowerClient(NumPyClient):
 
         set_weights(self.net, parameters)
         tik = time.perf_counter()
-        optim = torch.optim.SGD(self.net.parameters(), lr=learning_rate)
-        loss_fn = torch.nn.CrossEntropyLoss().to(self.ctx.device)
         info(f"Starting Training - Round {config['server-round']}")
 
         loss = train(
             self.net,
             self.train_dataloader,
             self.ctx.device,
-            optim,
-            loss_fn,
             epochs=local_epochs,
+            lr=learning_rate,
             input_features=self.ctx.dataset_cfg.input_features,
             target_features=self.ctx.dataset_cfg.target_features,
         )
@@ -88,7 +85,6 @@ class FlowerClient(NumPyClient):
         result = OrderedDict()
         props_type = config.get("props_type", '')
         metrics_agg = config.get("metrics_agg", "last")
-        result["simple_id"] = self.ctx.simple_id
         if props_type == "system":
             result.update(client_metrics_utils.get_client_properties())
         elif props_type == "metrics" and self.metrics_collector:
@@ -108,6 +104,7 @@ def init_client(context: Context):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     ctx = ClientContext(
+        cid=context.node_id,
         simple_id=simple_id,
         flwr_ctx=context,
         client_cfg=client_cfg,
@@ -132,24 +129,28 @@ def init_client(context: Context):
         )
         info(f"Validation dataset size: {len(eval_loader.dataset)}")
 
+    client_info = {
+        "cid": context.node_id, "simple_id": simple_id,
+        "props": client_metrics_utils.get_client_properties(),
+        "dataset": client_metrics_utils.get_dataset_info(train_loader, eval_loader)
+    }
+
+    debug(f"Client Info: {client_info}")
     if client_cfg.zmq.enable:
         init_zmq("default", client_cfg.zmq.host, client_cfg.zmq.port)
-        system_props = client_metrics_utils.get_client_properties()
-        to_zmq(f"client-props", {"client_id": ctx.simple_id, "system": system_props})
+        to_zmq(f"client-init", client_info)
 
     metrics_collector = None
     if client_cfg.collect_metrics:
         metrics_collector = MetricsCollector(
             interval=client_cfg.collect_metrics_interval,
-            server_address=client_cfg.server_address,
             publish_callback=lambda metrics: to_zmq(
-                "client-props",
-                {"client_id": ctx.simple_id, "metrics": metrics}
+                "client-metrics",
+                {"cid": context.node_id, "metrics": metrics}
             ) if client_cfg.zmq.enable else None
         )
 
-    model = Net()
-    return FlowerClient(ctx, model, train_loader, eval_loader, metrics_collector)
+    return FlowerClient(ctx, train_loader, eval_loader, metrics_collector)
 
 
 def client_fn(context: Context):
