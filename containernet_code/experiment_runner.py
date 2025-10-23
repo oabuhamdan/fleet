@@ -39,9 +39,7 @@ class ExperimentRunner:
 
         self.running = True
         self._start_server()
-        time.sleep(2)
         self._start_clients()
-        time.sleep(2)
         self._start_app()
         self._start_serverapp_monitor()
         info(f"Experiment started. Logs at: {self.log_path}")
@@ -126,6 +124,7 @@ class ExperimentRunner:
     def _start_service(self, host, cmd, name):
         full_cmd = f"nohup {cmd} > /tmp/{name}.log 2>&1 & "
         host.cmd(full_cmd)
+        time.sleep(0.5) # Give it a moment to start
         pid, _, _ = host.pexec(["pgrep", "-f", name])
         debug(f"Started {name} on {host.name} with PID {pid.strip()}")
         self.running_services[host].append((name, int(pid)))
