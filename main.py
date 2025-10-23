@@ -14,7 +14,7 @@ from common.static import *
 from common.utils import plot_topology
 from containernet_code.background_traffic.background_gen import BGTrafficRunner
 from containernet_code.background_traffic.traffic_generators import get_traffic_generator
-from containernet_code.background_traffic.traffic_patterns import  get_traffic_pattern
+from containernet_code.background_traffic.traffic_patterns import get_traffic_pattern
 from containernet_code.experiment_runner import ExperimentRunner
 from containernet_code.my_containernet import MyContainernet
 from containernet_code.my_topology import TopologyHandler
@@ -46,6 +46,7 @@ def main(cfg: MainConfig):
         sdn_conf = cfg.net.sdn
         controller = RemoteController('c0', ip=sdn_conf.controller_ip, port=sdn_conf.controller_port)
 
+    config_checks(cfg)
     topo_handler = TopologyHandler(log_path, cfg.net)
     plot_topology(log_path, topo_handler)
 
@@ -66,6 +67,20 @@ def main(cfg: MainConfig):
     )
     net.interact()
     info("FLEET terminated successfully.")
+
+
+def config_checks(cfg):
+    if not cfg.net.sdn.sdn_enabled and not cfg.net.topology.switch_config.get("stp", False):
+        print("Warning: STP is disabled on switches, this may lead to loops in the network!")
+        input("Proceed? (Enter to continue, Ctrl+C to abort)")
+    if cfg.net.fl.server_limits and cfg.net.fl.server_limits.cpu < 0.5:
+        print("Server CPU limit is set very low, this may lead to performance degradation.")
+    if cfg.net.fl.server_limits and cfg.net.fl.server_limits.mem < 1024:
+        print("Server memory limit is set very low, this may lead to instability.")
+    if cfg.net.fl.clients_limits.cpu < 0.5:
+        print("Client CPU limit is set very low, this may lead to performance degradation.")
+    if cfg.net.fl.clients_limits.mem < 512:
+        print("Client memory limit is set very low, this may lead to instability.")
 
 
 if __name__ == "__main__":
