@@ -83,15 +83,15 @@ class FlowerClient(NumPyClient):
         return loss, len(self.eval_dataloader.dataset), metrics
 
     def get_properties(self, config: Config) -> dict[str, Scalar]:
-        result = OrderedDict()
-        props_type = config.get("props_type", '')
+        result = {}
+        props = config.get("props", '').split(",")
         metrics_agg = config.get("metrics_agg", "last")
-        if props_type == "system":
-            result.update(client_metrics_utils.get_client_properties())
-        elif props_type == "metrics" and self.metrics_collector:
-            result.update(self.metrics_collector.get_metrics(aggregation=metrics_agg))
-        elif props_type == "dataset":
-            result.update(client_metrics_utils.get_dataset_info(self.train_dataloader, self.eval_dataloader))
+        if "system" in props:
+            result["system"]: client_metrics_utils.get_client_properties()
+        elif "metrics" in props and self.metrics_collector:
+            result["metrics"] = self.metrics_collector.get_metrics(aggregation=metrics_agg)
+        elif "dataset" in props:
+            result["dataset"] = client_metrics_utils.get_dataset_info(self.train_dataloader, self.eval_dataloader)
         debug(f"Properties: {result}")
         return result
 

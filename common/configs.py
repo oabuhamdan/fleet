@@ -48,7 +48,9 @@ class FLServerConfig:
     stop_by_accuracy: bool = False
     accuracy_level: float = 0.8
     collect_metrics: bool = False
-    collect_metrics_interval: int = 60
+    # For now, collecting metrics periodically doesn't work as expected since Flower uses a single-threaded gRPC channel
+    # Follow up on Flower discussions: https://discuss.flower.ai/t/concurrent-grpc-calls/1116
+    # collect_metrics_interval: int = 60
     zmq: ZMQConfig = field(default_factory=ZMQConfig)
     extra: Dict[str, Any] = field(default_factory=dict)
 

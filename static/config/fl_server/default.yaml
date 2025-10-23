@@ -10,4 +10,4 @@ server_param_init: true
 stop_by_accuracy: false
 accuracy_level: 0.8
 collect_metrics: true
-collect_metrics_interval: 5
+# collect_metrics_interval: 30
