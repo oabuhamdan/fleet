@@ -30,16 +30,17 @@ def train(
         model: nn.Module,
         trainloader,
         device,
-        optimizer,
-        loss_fn,
         input_features: list[str],
         target_features: list[str],
         epochs: int = 1,
+        learning_rate: float = 0.01,
         scheduler=None,
         log_interval: int = 100,
         **kwargs
 ):
     """Train the model for a number of epochs."""
+    optim = torch.optim.SGD(model.parameters(), lr=learning_rate)
+    loss_fn = torch.nn.CrossEntropyLoss().to(device)
     model.to(device)
     model.train()
     running_loss = 0.0
@@ -47,11 +48,11 @@ def train(
         for i, batch in enumerate(trainloader):
             inputs = batch[input_features[0]].to(device)
             targets = batch[target_features[0]].to(device)
-            optimizer.zero_grad()
+            optim.zero_grad()
             outputs = model(inputs)
             loss = loss_fn(outputs, targets)
             loss.backward()
-            optimizer.step()
+            optim.step()
             running_loss += loss.item()
             if i % log_interval == 0:
                 info(f"Epoch {epoch} - Step {i}")
