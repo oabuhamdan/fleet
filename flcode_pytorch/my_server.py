@@ -126,10 +126,10 @@ class MyServer(flwr.server.Server):
                 loss_cen, metrics_cen = res_cen
                 log(
                     INFO,
-                    "fit progress: (%s, %s, %s, %s)",
+                    "Fit Progress: R %s:  M: %s | RT: %.2f sec | CT: %.2f sec",
                     current_round,
-                    loss_cen,
                     metrics_cen,
+                    time.perf_counter() - round_start_time,
                     time.perf_counter() - fit_start_time,
                 )
                 history.add_loss_centralized(server_round=current_round, loss=loss_cen)
